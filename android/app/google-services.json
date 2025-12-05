@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "626712733047",
+    "project_id": "age-empower-7wy650",
+    "storage_bucket": "age-empower-7wy650.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:626712733047:android:bbcb1a3483b488eed1ad72",
+        "android_client_info": {
+          "package_name": "com.mycompany.ageempower"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDwMHkeKV_q6e--RKv0ItjzM2wMK90y6-A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
