@@ -40,24 +40,65 @@ class GlobalAppControllerCW extends StatefulWidget {
 }
 
 class _GlobalAppControllerCWState extends State<GlobalAppControllerCW> {
+  // ----------------------------
+  // AUTH / USER
+  // ----------------------------
   String? uid;
   Map<String, dynamic> userData = {};
   String userRole = "senior";
   bool loadingUser = true;
 
+  // Added: auth state flags for Step 2 routing
+  bool get isLoggedIn => uid != null;
+
+  // ----------------------------
+  // STEP 2: ROUTE KEY NAV (CW routing)
+  // ----------------------------
+  // Route keys you can standardize:
+  // login, home, health, medications, messages, family, caregivers, emergency,
+  // reports, appointments, devices, settings, security, voice, agency
+  String currentRouteKey = "home";
+  int activeTab = 0;
+
+  void setRouteKey(String routeKey, {int? tabIndex}) {
+    currentRouteKey = routeKey;
+    if (tabIndex != null) activeTab = tabIndex;
+    if (mounted) setState(() {});
+  }
+
+  // Convenience helpers (optional)
+  void goHome() => setRouteKey("home", tabIndex: 0);
+  void goLogin() => setRouteKey("login");
+  void goHealth() => setRouteKey("health");
+  void goMedications() => setRouteKey("medications");
+  void goMessages() => setRouteKey("messages");
+  void goFamily() => setRouteKey("family");
+  void goEmergency() => setRouteKey("emergency");
+  void goReports() => setRouteKey("reports");
+  void goAppointments() => setRouteKey("appointments");
+  void goDevices() => setRouteKey("devices");
+  void goSettings() => setRouteKey("settings");
+
+  // ----------------------------
   // Responsive flags
+  // ----------------------------
   bool isMobile = true;
   bool isTablet = false;
   bool isDesktop = false;
   bool isUltraWide = false;
   double deviceWidth = 0;
 
+  // ----------------------------
   // Global streams & caches
+  // ----------------------------
   StreamSubscription? emergencySub;
   StreamSubscription? chatSub;
   StreamSubscription? notificationSub;
   StreamSubscription? caregiverTaskSub;
   StreamSubscription? healthSub;
+
+  // Added: auth state listener
+  StreamSubscription<User?>? authSub;
 
   List<Map<String, dynamic>> emergencyEvents = [];
   List<Map<String, dynamic>> unreadMessages = [];
@@ -69,6 +110,75 @@ class _GlobalAppControllerCWState extends State<GlobalAppControllerCW> {
   void initState() {
     super.initState();
     _bootstrap();
+    _listenAuthChanges(); // upgrade: keep app reactive if user logs in/out
+  }
+
+  @override
+  void dispose() {
+    // cancel streams
+    emergencySub?.cancel();
+    chatSub?.cancel();
+    notificationSub?.cancel();
+    caregiverTaskSub?.cancel();
+    healthSub?.cancel();
+    authSub?.cancel();
+
+    emergencyEscalationTimer?.cancel();
+    super.dispose();
+  }
+
+  void _listenAuthChanges() {
+    authSub = FirebaseAuth.instance.authStateChanges().listen((user) async {
+      final newUid = user?.uid;
+      if (newUid == uid) return;
+
+      uid = newUid;
+
+      // Reset caches when switching auth state
+      userData = {};
+      userRole = "senior";
+      emergencyEvents = [];
+      unreadMessages = [];
+      notifications = [];
+      healthSnapshot = {};
+      caregiverTasks = [];
+
+      // Stop existing listeners
+      await emergencySub?.cancel();
+      await chatSub?.cancel();
+      await notificationSub?.cancel();
+      await caregiverTaskSub?.cancel();
+      await healthSub?.cancel();
+
+      if (uid == null) {
+        // logged out
+        loadingUser = false;
+        currentRouteKey = "login";
+        if (mounted) setState(() {});
+        return;
+      }
+
+      // logged in
+      loadingUser = true;
+      if (mounted) setState(() {});
+      await _loadUserProfile();
+      await loadSettings();
+
+      _initEmergencyListener();
+      _initNotificationListener();
+      _initChatListener();
+      _initHealthListener();
+      _initCaregiverTaskListener();
+
+      // Start escalation loop (optional)
+      startEmergencyEscalationLoop();
+
+      // Default route after login
+      currentRouteKey = "home";
+
+      loadingUser = false;
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _bootstrap() async {
@@ -76,27 +186,42 @@ class _GlobalAppControllerCWState extends State<GlobalAppControllerCW> {
 
     if (uid == null) {
       loadingUser = false;
+      currentRouteKey = "login";
       setState(() {});
       return;
     }
 
     await _loadUserProfile();
+    await loadSettings();
+
     _initEmergencyListener();
     _initNotificationListener();
     _initChatListener();
     _initHealthListener();
     _initCaregiverTaskListener();
 
+    // Start escalation loop (optional)
+    startEmergencyEscalationLoop();
+
     loadingUser = false;
     if (mounted) setState(() {});
   }
 
   Future<void> _loadUserProfile() async {
+    if (uid == null) return;
+
     final doc =
         await FirebaseFirestore.instance.collection("users").doc(uid).get();
 
     userData = doc.data() ?? {};
     userRole = userData["role"] ?? "senior";
+
+    // upgrade: role-aware default route
+    if (!isLoggedIn) {
+      currentRouteKey = "login";
+    } else {
+      currentRouteKey = (currentRouteKey == "login") ? "home" : currentRouteKey;
+    }
   }
 
   void _updateResponsiveEngine(BuildContext context) {
@@ -111,6 +236,7 @@ class _GlobalAppControllerCWState extends State<GlobalAppControllerCW> {
   // Listeners ------------------------------------------------------
 
   void _initEmergencyListener() {
+    if (uid == null) return;
     emergencySub = FirebaseFirestore.instance
         .collection("emergencies")
         .where("userId", isEqualTo: uid)
@@ -118,11 +244,12 @@ class _GlobalAppControllerCWState extends State<GlobalAppControllerCW> {
         .snapshots()
         .listen((snapshot) {
       emergencyEvents = snapshot.docs.map((e) => e.data()).toList();
-      setState(() {});
+      if (mounted) setState(() {});
     });
   }
 
   void _initNotificationListener() {
+    if (uid == null) return;
     notificationSub = FirebaseFirestore.instance
         .collection("notifications")
         .where("toUser", isEqualTo: uid)
@@ -130,11 +257,12 @@ class _GlobalAppControllerCWState extends State<GlobalAppControllerCW> {
         .snapshots()
         .listen((snapshot) {
       notifications = snapshot.docs.map((e) => e.data()).toList();
-      setState(() {});
+      if (mounted) setState(() {});
     });
   }
 
   void _initChatListener() {
+    if (uid == null) return;
     chatSub = FirebaseFirestore.instance
         .collection("messages")
         .where("receiverId", isEqualTo: uid)
@@ -142,11 +270,12 @@ class _GlobalAppControllerCWState extends State<GlobalAppControllerCW> {
         .snapshots()
         .listen((snapshot) {
       unreadMessages = snapshot.docs.map((e) => e.data()).toList();
-      setState(() {});
+      if (mounted) setState(() {});
     });
   }
 
   void _initHealthListener() {
+    if (uid == null) return;
     healthSub = FirebaseFirestore.instance
         .collection("users")
         .doc(uid)
@@ -158,18 +287,19 @@ class _GlobalAppControllerCWState extends State<GlobalAppControllerCW> {
       if (snap.docs.isNotEmpty) {
         healthSnapshot = snap.docs.first.data();
       }
-      setState(() {});
+      if (mounted) setState(() {});
     });
   }
 
   void _initCaregiverTaskListener() {
+    if (uid == null) return;
     caregiverTaskSub = FirebaseFirestore.instance
         .collection("tasks")
         .where("assignedTo", isEqualTo: uid)
         .snapshots()
         .listen((snap) {
       caregiverTasks = snap.docs.map((e) => e.data()).toList();
-      setState(() {});
+      if (mounted) setState(() {});
     });
   }
 
@@ -193,7 +323,91 @@ class _GlobalAppControllerCWState extends State<GlobalAppControllerCW> {
 
   Widget buildHomeForUser() => _routeForRole(userRole);
 
+  // Added: Step 2 routeKey builder (AutoNavigatorCW-style)
+  // This does NOT remove anything; it adds a clean central mapping.
+  Widget buildForRouteKey() {
+    // If logged out, you can point to your login CW
+    if (!isLoggedIn) {
+      // If you have a dedicated login CW, put it here.
+      // Keeping safe fallback:
+      return MultiDeviceAppShellCW(content: LoginSignupCW());
+    }
+
+    // Role guards (basic)
+    bool isFamily = userRole == "family";
+    bool isCaregiver = userRole == "caregiver";
+    bool isAgency = userRole == "agency";
+
+    switch (currentRouteKey) {
+      case "home":
+        return buildHomeForUser();
+
+      case "health":
+        return MultiDeviceAppShellCW(content: HealthOverviewCardCW());
+
+      case "medications":
+        return MultiDeviceAppShellCW(content: MedicationListCW());
+
+      case "messages":
+        return MultiDeviceAppShellCW(content: ChatListCW());
+
+      case "family":
+        // guard
+        if (!isFamily) return buildHomeForUser();
+        return MultiDeviceAppShellCW(content: FamilyDashboardCW());
+
+      case "caregivers":
+        // guard
+        if (!(isFamily || isAgency)) return buildHomeForUser();
+        return MultiDeviceAppShellCW(content: CaregiverManagementDashboardCW());
+
+      case "emergency":
+        return MultiDeviceAppShellCW(content: FamilyEmergencyMonitorCW());
+
+      case "reports":
+        return MultiDeviceAppShellCW(content: ReportsWrapperPageCW());
+
+      case "appointments":
+        return MultiDeviceAppShellCW(content: AppointmentListCW());
+
+      case "devices":
+        return MultiDeviceAppShellCW(content: DeviceIntegrationDashboardCW());
+
+      case "security":
+        return MultiDeviceAppShellCW(
+          content: Column(
+            children: [
+              SecuritySessionsListCW(),
+              SecurityActivityLogCW(),
+              SecurityRemoteWipeCW(),
+              SecurityDataExportCW(),
+            ],
+          ),
+        );
+
+      case "voice":
+        return MultiDeviceAppShellCW(
+          content: Column(
+            children: [
+              VoiceSettingsMainCW(),
+              VoiceKeywordEditorCW(),
+              VoiceLanguageSelectorCW(),
+            ],
+          ),
+        );
+
+      case "agency":
+        if (!isAgency) return buildHomeForUser();
+        return MultiDeviceAppShellCW(
+            content: AgencyDashboardSummaryCW(userId: uid));
+
+      default:
+        return buildHomeForUser();
+    }
+  }
+
   // Navigation helpers --------------------------------------------
+  // (Kept EXACTLY, but also upgraded with routeKey alternatives below)
 
   void openChatThread(BuildContext context, String partnerId) {
     Navigator.push(
@@ -273,6 +487,20 @@ class _GlobalAppControllerCWState extends State<GlobalAppControllerCW> {
     );
   }
 
+  // Added: Step 2 navigation equivalents (preferred going forward)
+  void navToHome() => setRouteKey("home", tabIndex: 0);
+  void navToHealth() => setRouteKey("health", tabIndex: 1);
+  void navToMeds() => setRouteKey("medications", tabIndex: 2);
+  void navToMessages() => setRouteKey("messages", tabIndex: 3);
+  void navToFamily() => setRouteKey("family", tabIndex: 3);
+  void navToEmergency() => setRouteKey("emergency", tabIndex: 4);
+  void navToReports() => setRouteKey("reports");
+  void navToAppointments() => setRouteKey("appointments");
+  void navToDevices() => setRouteKey("devices");
+  void navToSecurity() => setRouteKey("security");
+  void navToVoice() => setRouteKey("voice");
+  void navToSettings() => setRouteKey("settings");
+
   // Emergency helpers ---------------------------------------------
 
   bool get hasActiveEmergency =>
@@ -329,6 +557,7 @@ class _GlobalAppControllerCWState extends State<GlobalAppControllerCW> {
 
   Future<void> refreshAll() async {
     await _loadUserProfile();
+    await loadSettings();
   }
 
   // Settings / language / theme -----------------------------------
@@ -363,7 +592,7 @@ class _GlobalAppControllerCWState extends State<GlobalAppControllerCW> {
       largeTouchTargets = accDoc.data()?["largeTouchTargets"] ?? false;
     }
 
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   Map<String, dynamic> get themeSettings => {
@@ -401,7 +630,7 @@ class _GlobalAppControllerCWState extends State<GlobalAppControllerCW> {
       "payload": payload ?? {},
       "timestamp": DateTime.now().millisecondsSinceEpoch,
     });
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   Future<void> syncNow() async {
@@ -424,7 +653,7 @@ class _GlobalAppControllerCWState extends State<GlobalAppControllerCW> {
       } catch (_) {}
     }
 
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   bool get hasOfflineItems => offlineQueue.isNotEmpty;
@@ -433,14 +662,14 @@ class _GlobalAppControllerCWState extends State<GlobalAppControllerCW> {
 
   void updateOnlineStatus(bool online) {
     isOnline = online;
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   Future<void> reloadUserEverything() async {
     await _loadUserProfile();
     await loadSettings();
     await refreshAll();
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   // Device integrations -------------------------------------------
@@ -451,17 +680,17 @@ class _GlobalAppControllerCWState extends State<GlobalAppControllerCW> {
 
   Future<void> connectFitbit() async {
     fitbitConnected = true;
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   Future<void> connectGoogleFit() async {
     googleFitConnected = true;
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   Future<void> connectAppleHealth() async {
     appleHealthConnected = true;
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   Map<String, dynamic> get deviceIntegrationStatus => {
@@ -532,7 +761,7 @@ class _GlobalAppControllerCWState extends State<GlobalAppControllerCW> {
         .doc(eventId)
         .update({"${target}Status": "sent"});
 
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   // AI engine -------------------------------------------------------
@@ -609,9 +838,13 @@ ${generateAIRiskExplanation()}
       );
     }
 
+    // Fix: "home" was undefined in your original build.
+    // Upgrade: If widget.child is provided, we render it; otherwise use routeKey mapping.
+    final Widget fallback = buildForRouteKey();
+
     return _GlobalExports(
       controller: this,
-      child: widget.child ?? home,
+      child: widget.child ?? fallback,
     );
   }
 }

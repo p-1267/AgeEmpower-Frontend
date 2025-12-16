@@ -150,3 +150,10 @@ export 'auto_page_c_w.dart' show AutoPageCW;
 export 'auto_navigator_c_w.dart' show AutoNavigatorCW;
 export 'auto_header_c_w.dart' show AutoHeaderCW;
 export 'auto_scaffold_c_w.dart' show AutoScaffoldCW;
+export 'global_navigation_interceptor_c_w.dart'
+    show GlobalNavigationInterceptorCW;
+export 'auto_content_wrapper_c_w.dart' show AutoContentWrapperCW;
+export 'global_sync_status_c_w.dart' show GlobalSyncStatusCW;
+export 'global_error_boundary_c_w.dart' show GlobalErrorBoundaryCW;
+export 'global_accessibility_enforcer_c_w.dart'
+    show GlobalAccessibilityEnforcerCW;

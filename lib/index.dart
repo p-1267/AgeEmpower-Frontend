@@ -28,3 +28,4 @@ export '/storage_data_page/storage_data_page_widget.dart'
 export '/about_page/about_page_widget.dart' show AboutPageWidget;
 export '/custom_metric_creator/custom_metric_creator_widget.dart'
     show CustomMetricCreatorWidget;
+export '/app_host/app_host_widget.dart' show AppHostWidget;

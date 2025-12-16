@@ -52,7 +52,7 @@ class _MainshellWidgetState extends State<MainshellWidget> {
         return;
       }
 
-      context.goNamedAuth(MainshellWidget.routeName, context.mounted);
+      context.goNamedAuth(AppHostWidget.routeName, context.mounted);
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));

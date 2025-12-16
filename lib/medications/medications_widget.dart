@@ -49,7 +49,7 @@ class _MedicationsWidgetState extends State<MedicationsWidget> {
         return;
       }
 
-      context.goNamedAuth(MainshellWidget.routeName, context.mounted);
+      context.goNamedAuth(AppHostWidget.routeName, context.mounted);
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));

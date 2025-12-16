@@ -26,19 +26,24 @@ class AutoPageCW extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Access the global controller
+    // Access the global controller (returns the controller STATE instance)
     final controller = GlobalAppControllerCW.of(context);
 
-    // Get the correct responsive engine
-    final responsive = ResponsiveLayoutEngineCW.of(context);
+    // Get role from controller (matches the upgraded GlobalAppControllerCW)
+    final String role = controller.userRole;
 
-    // Get user role
-    final role = controller.role;
+    // Step 2 routing: controller decides which page to show by routeKey/auth/role
+    // (Falls back safely if someone is not logged in)
+    final Widget target = AutoContentWrapperCW(
+      child: controller.buildForRouteKey(),
+    );
 
-    // Build the correct dashboard widget
-    final Widget target = _pageForRole(role, controller);
+    // Compute a safe content width (avoid depending on ResponsiveLayoutEngineCW.of)
+    final double screenW = MediaQuery.of(context).size.width;
+    final double safeWidth = _safeWidthFor(screenW);
 
-    // Wrap with AppThemeCW + Responsive Shell
+    // Wrap with AppThemeCW + Responsive Layout + Shell
+    // (Keeps your architecture, but makes routing controlled by controller)
     return AppThemeCW(
       role: role,
       themeSettings: controller.themeSettings,
@@ -46,7 +51,7 @@ class AutoPageCW extends StatelessWidget {
         child: MultiDeviceAppShellCW(
           content: Center(
             child: SizedBox(
-              width: responsive.safeWidth,
+              width: safeWidth,
               child: target,
             ),
           ),
@@ -56,9 +61,28 @@ class AutoPageCW extends StatelessWidget {
   }
 
   // ---------------------------------------------------------------------------
-  // ROLE-BASED PAGE RESOLUTION
+  // SAFE WIDTH (simple responsive clamp)
   // ---------------------------------------------------------------------------
-  Widget _pageForRole(String role, GlobalAppControllerCWState controller) {
+  double _safeWidthFor(double screenW) {
+    // Mobile: full width
+    if (screenW < 600) return screenW;
+
+    // Tablet: keep readable margins
+    if (screenW < 1024) return 720;
+
+    // Desktop: comfortable centered column
+    if (screenW < 1440) return 960;
+
+    // Ultra-wide: cap content width
+    return 1100;
+  }
+
+  // ---------------------------------------------------------------------------
+  // ROLE-BASED PAGE RESOLUTION (kept for compatibility / fallback)
+  // NOTE: Routing is now handled by controller.buildForRouteKey().
+  // This method remains here so you aren't losing anything.
+  // ---------------------------------------------------------------------------
+  Widget _pageForRole(String role, dynamic controller) {
     switch (role) {
       case "senior":
         return HomeDashboardCW();
@@ -71,7 +95,7 @@ class AutoPageCW extends StatelessWidget {
 
       case "agency":
         return AgencyDashboardSummaryCW(
-          userId: controller.profile["userId"],
+          userId: controller.uid,
         );
 
       default:

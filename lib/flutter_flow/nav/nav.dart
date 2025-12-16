@@ -78,14 +78,13 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
       refreshListenable: appStateNotifier,
       navigatorKey: appNavigatorKey,
       errorBuilder: (context, state) =>
-          appStateNotifier.loggedIn ? MainshellWidget() : MedicationsWidget(),
+          appStateNotifier.loggedIn ? AppHostWidget() : AppHostWidget(),
       routes: [
         FFRoute(
           name: '_initialize',
           path: '/',
-          builder: (context, _) => appStateNotifier.loggedIn
-              ? MainshellWidget()
-              : MedicationsWidget(),
+          builder: (context, _) =>
+              appStateNotifier.loggedIn ? AppHostWidget() : AppHostWidget(),
         ),
         FFRoute(
           name: MainshellWidget.routeName,
@@ -197,6 +196,11 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           name: CustomMetricCreatorWidget.routeName,
           path: CustomMetricCreatorWidget.routePath,
           builder: (context, params) => CustomMetricCreatorWidget(),
+        ),
+        FFRoute(
+          name: AppHostWidget.routeName,
+          path: AppHostWidget.routePath,
+          builder: (context, params) => AppHostWidget(),
         )
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );
@@ -369,7 +373,7 @@ class FFRoute {
 
           if (requireAuth && !appStateNotifier.loggedIn) {
             appStateNotifier.setRedirectLocationIfUnset(state.uri.toString());
-            return '/medications';
+            return '/AppHost';
           }
           return null;
         },

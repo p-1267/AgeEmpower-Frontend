@@ -56,6 +56,15 @@
 
 	<key>NSLocationWhenInUseUsageDescription</key>
     <string>Allow AgeEmpower to access your location to share it with emergency contacts.</string>
+	<key>NSMicrophoneUsageDescription</key>
+    <string>Allow AgeEmpower to use the microphone for voice commands and emergency assistance.
+</string>
+	<key>PermissionGroupNotification</key>
+    <string>Allow AgeEmpower to send emergency alerts, reminders, and important health notifications.
+</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+    <string>Allow AgeEmpower to connect to wearable devices and health sensors for monitoring and emergency detection.
+</string>
 
 
 
