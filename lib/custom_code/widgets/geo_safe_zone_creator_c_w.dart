@@ -11,35 +11,36 @@ import 'package:flutter/material.dart';
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import '/custom_code/widgets/index.dart';
-// DO NOT REMOVE ABOVE
+import '/custom_code/actions/index.dart';
+import '/flutter_flow/custom_functions.dart';
 
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gmaps;
 
 class GeoSafeZoneCreatorCW extends StatefulWidget {
-  final double? width;
-  final double? height;
-
   const GeoSafeZoneCreatorCW({
-    Key? key,
+    super.key,
     this.width,
     this.height,
-  }) : super(key: key);
+  });
+
+  final double? width;
+  final double? height;
 
   @override
   State<GeoSafeZoneCreatorCW> createState() => _GeoSafeZoneCreatorCWState();
 }
 
 class _GeoSafeZoneCreatorCWState extends State<GeoSafeZoneCreatorCW> {
-  GoogleMapController? mapController;
-  LatLng? center;
+  gmaps.GoogleMapController? mapController;
+  gmaps.LatLng? center;
   double radius = 150;
 
-  final nameCtrl = TextEditingController();
+  final TextEditingController nameCtrl = TextEditingController();
   bool saving = false;
 
-  void _onMapTap(LatLng pos) {
+  void _onMapTap(gmaps.LatLng pos) {
     setState(() {
       center = pos;
     });
@@ -54,22 +55,21 @@ class _GeoSafeZoneCreatorCWState extends State<GeoSafeZoneCreatorCW> {
     setState(() => saving = true);
 
     await FirebaseFirestore.instance
-        .collection("users")
+        .collection('users')
         .doc(uid)
-        .collection("safeZones")
+        .collection('safeZones')
         .add({
-      "name": nameCtrl.text.trim(),
-      "lat": center!.latitude,
-      "lng": center!.longitude,
-      "radius": radius,
-      "createdAt": FieldValue.serverTimestamp(),
+      'name': nameCtrl.text.trim(),
+      'center': GeoPoint(center!.latitude, center!.longitude),
+      'radius': radius,
+      'createdAt': FieldValue.serverTimestamp(),
     });
 
     setState(() => saving = false);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Safe Zone Created")),
+        const SnackBar(content: Text('Safe Zone Created')),
       );
     }
   }
@@ -84,27 +84,27 @@ class _GeoSafeZoneCreatorCWState extends State<GeoSafeZoneCreatorCW> {
       height: h,
       child: Column(
         children: [
-          // Input
           TextField(
             controller: nameCtrl,
             decoration: const InputDecoration(
-              labelText: "Zone Name (e.g., Home)",
+              labelText: 'Zone Name (e.g., Home)',
             ),
           ),
           const SizedBox(height: 6),
-
           Expanded(
-            child: GoogleMap(
-              initialCameraPosition: const CameraPosition(
-                  target: LatLng(37.4219999, -122.0840575), zoom: 15),
+            child: gmaps.GoogleMap(
+              initialCameraPosition: const gmaps.CameraPosition(
+                target: gmaps.LatLng(37.4219999, -122.0840575),
+                zoom: 15,
+              ),
               myLocationEnabled: true,
               onMapCreated: (c) => mapController = c,
               onTap: _onMapTap,
               circles: center == null
-                  ? {}
+                  ? <gmaps.Circle>{}
                   : {
-                      Circle(
-                        circleId: const CircleId("zone"),
+                      gmaps.Circle(
+                        circleId: const gmaps.CircleId('zone'),
                         center: center!,
                         fillColor: Colors.blue.withOpacity(0.1),
                         strokeColor: Colors.blue,
@@ -113,44 +113,39 @@ class _GeoSafeZoneCreatorCWState extends State<GeoSafeZoneCreatorCW> {
                       )
                     },
               markers: center == null
-                  ? {}
+                  ? <gmaps.Marker>{}
                   : {
-                      Marker(
-                          markerId: const MarkerId("center"), position: center!)
+                      gmaps.Marker(
+                        markerId: const gmaps.MarkerId('center'),
+                        position: center!,
+                      )
                     },
             ),
           ),
-
           const SizedBox(height: 10),
-
-          // Radius Slider
           Row(
             children: [
-              const Text("Radius: "),
+              const Text('Radius: '),
               Expanded(
                 child: Slider(
                   value: radius,
                   min: 50,
                   max: 500,
                   divisions: 10,
-                  label: "${radius.toInt()} m",
+                  label: '${radius.toInt()} m',
                   onChanged: (v) => setState(() => radius = v),
                 ),
               ),
             ],
           ),
-
           saving
               ? const CircularProgressIndicator()
               : ElevatedButton(
                   onPressed: _save,
-                  child: const Text("Save Zone"),
+                  child: const Text('Save Zone'),
                 ),
         ],
       ),
     );
   }
 }
-
-// Set your widget name, define your parameter, and then add the
-// boilerplate code using the green button on the right!

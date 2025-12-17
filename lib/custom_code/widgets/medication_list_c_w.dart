@@ -10,26 +10,12 @@ import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
-import '/custom_code/widgets/index.dart';
-import '/custom_code/actions/index.dart';
-import '/flutter_flow/custom_functions.dart';
-
-import 'package:flutter/foundation.dart' show kIsWeb;
-
-import 'emergency_cascade_c_w_firestore_service.dart';
-import 'emergency_cascade_c_w_mobile_engine.dart';
-import 'emergency_cascade_c_w_web_engine.dart';
-
-class EmergencyCascadeCWMain extends StatelessWidget {
-  const EmergencyCascadeCWMain({super.key});
+class MedicationListCW extends StatelessWidget {
+  const MedicationListCW({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return EmergencyCascadeCWFirestoreService(
-      child: kIsWeb
-          ? const EmergencyCascadeCWWebEngine()
-          : const EmergencyCascadeCWMobileEngine(),
-    );
+    return const Center(child: Text('Medication List (Stub)'));
   }
 }
 

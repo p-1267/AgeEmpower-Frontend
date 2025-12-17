@@ -10,13 +10,22 @@ import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
-import 'dart:convert';
+import '/custom_code/widgets/index.dart';
+import '/custom_code/actions/index.dart';
+import '/flutter_flow/custom_functions.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 
 class HealthVitalAITrendCW extends StatefulWidget {
-  const HealthVitalAITrendCW({super.key});
+  const HealthVitalAITrendCW({
+    super.key,
+    this.width,
+    this.height,
+  });
+
+  final double? width;
+  final double? height;
 
   @override
   State<HealthVitalAITrendCW> createState() => _HealthVitalAITrendCWState();
@@ -48,21 +57,20 @@ class _HealthVitalAITrendCWState extends State<HealthVitalAITrendCW> {
       final since = DateTime.now().subtract(const Duration(days: 30));
 
       final snap = await FirebaseFirestore.instance
-          .collection("users")
+          .collection('users')
           .doc(userId)
-          .collection("vitals")
-          .where("timestamp", isGreaterThan: Timestamp.fromDate(since))
-          .orderBy("timestamp", descending: true)
+          .collection('vitals')
+          .where('timestamp', isGreaterThan: Timestamp.fromDate(since))
+          .orderBy('timestamp', descending: true)
           .get();
 
-      vitals = snap.docs.map((d) => d.data() as Map<String, dynamic>).toList();
+      vitals = snap.docs.map((d) => d.data()).toList();
 
-      // Load previous AI trend report
       final reportSnap = await FirebaseFirestore.instance
-          .collection("users")
+          .collection('users')
           .doc(userId)
-          .collection("healthAI")
-          .doc("trend")
+          .collection('healthAI')
+          .doc('trend')
           .get();
 
       if (reportSnap.exists) {
@@ -86,28 +94,26 @@ class _HealthVitalAITrendCWState extends State<HealthVitalAITrendCW> {
 
     setState(() => analyzing = true);
 
-    // Stub AI response — to be replaced by real backend later
     final simulatedResponse = {
-      "fallRisk": 0.42,
-      "heartRisk": 0.31,
-      "wanderingRisk": 0.18,
-      "overallRiskScore": 67,
-      "trendSummary":
-          "Vitals indicate moderately elevated fall risk due to variability in steps, sleep hours, and lower oxygen readings on certain days.",
-      "caregiverGuidance":
-          "Encourage consistent sleep schedules and hydration. Monitor for dizziness. Consider reviewing medication contributing to low oxygen levels.",
-      "seniorSummary":
-          "Your recent activity and sleep patterns suggest being careful with balance and movement.",
+      'fallRisk': 0.42,
+      'heartRisk': 0.31,
+      'wanderingRisk': 0.18,
+      'overallRiskScore': 67,
+      'trendSummary':
+          'Vitals indicate moderately elevated fall risk due to variability in steps, sleep hours, and lower oxygen readings on certain days.',
+      'caregiverGuidance':
+          'Encourage consistent sleep schedules and hydration. Monitor for dizziness.',
+      'seniorSummary':
+          'Your recent activity and sleep patterns suggest being careful with balance and movement.',
     };
 
     aiReport = simulatedResponse;
 
-    // SAVE AI TREND REPORT
     await FirebaseFirestore.instance
-        .collection("users")
+        .collection('users')
         .doc(userId)
-        .collection("healthAI")
-        .doc("trend")
+        .collection('healthAI')
+        .doc('trend')
         .set(simulatedResponse);
 
     setState(() => analyzing = false);
@@ -122,22 +128,26 @@ class _HealthVitalAITrendCWState extends State<HealthVitalAITrendCW> {
       return const Center(child: CircularProgressIndicator());
     }
     if (error) {
-      return const Center(child: Text("Unable to load vitals data."));
+      return const Center(child: Text('Unable to load vitals data.'));
     }
 
-    return Column(
-      children: [
-        _buildHeader(),
-        const SizedBox(height: 12),
-        _buildVitalTrendSummary(),
-        const SizedBox(height: 12),
-        _buildAITrendSection(),
-      ],
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: Column(
+        children: [
+          _buildHeader(),
+          const SizedBox(height: 12),
+          _buildVitalTrendSummary(),
+          const SizedBox(height: 12),
+          _buildAITrendSection(),
+        ],
+      ),
     );
   }
 
   // ------------------------------------------------------------------
-  // HEADER BAR
+  // HEADER
   // ------------------------------------------------------------------
   Widget _buildHeader() {
     return Row(
@@ -145,34 +155,30 @@ class _HealthVitalAITrendCWState extends State<HealthVitalAITrendCW> {
         const Icon(Icons.monitor_heart_rounded, size: 32),
         const SizedBox(width: 12),
         const Text(
-          "AI Vital Trends",
+          'AI Vital Trends',
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         const Spacer(),
         ElevatedButton(
           onPressed: analyzing ? null : _runAIAnalysis,
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
           child: analyzing
               ? const SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(color: Colors.white),
                 )
-              : const Text("Analyze Trends"),
+              : const Text('Analyze Trends'),
         ),
       ],
     );
   }
 
   // ------------------------------------------------------------------
-  // BASIC TREND VISUALIZATION (no charts)
+  // BASIC TREND SUMMARY
   // ------------------------------------------------------------------
   Widget _buildVitalTrendSummary() {
     if (vitals.isEmpty) {
-      return const Text(
-        "No recent vital data available.",
-        style: TextStyle(fontSize: 16),
-      );
+      return const Text('No recent vital data available.');
     }
 
     final recent = vitals.first;
@@ -185,12 +191,12 @@ class _HealthVitalAITrendCWState extends State<HealthVitalAITrendCW> {
       ),
       child: Column(
         children: [
-          _trendRow("Heart Rate", "${recent["heartRate"]} bpm"),
+          _trendRow('Heart Rate', '${recent['heartRate']} bpm'),
           _trendRow(
-              "Blood Pressure", "${recent["systolic"]}/${recent["diastolic"]}"),
-          _trendRow("Oxygen", "${recent["oxygen"]}%"),
-          _trendRow("Steps", "${recent["steps"]}"),
-          _trendRow("Sleep Hours", "${recent["sleepHours"]}h"),
+              'Blood Pressure', '${recent['systolic']}/${recent['diastolic']}'),
+          _trendRow('Oxygen', '${recent['oxygen']}%'),
+          _trendRow('Steps', '${recent['steps']}'),
+          _trendRow('Sleep Hours', '${recent['sleepHours']}h'),
         ],
       ),
     );
@@ -201,33 +207,24 @@ class _HealthVitalAITrendCWState extends State<HealthVitalAITrendCW> {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Expanded(
-            child: Text(label, style: const TextStyle(fontSize: 18)),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          )
+          Expanded(child: Text(label)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
 
   // ------------------------------------------------------------------
-  // AI TREND ANALYSIS SECTION
+  // AI TREND SECTION
   // ------------------------------------------------------------------
   Widget _buildAITrendSection() {
     if (aiReport == null) {
       return const Text(
-        "No AI trend analysis available. Run the analysis above.",
-        style: TextStyle(fontSize: 16),
+        'No AI trend analysis available. Run the analysis above.',
       );
     }
 
-    final score = aiReport!["overallRiskScore"] ?? 0;
+    final score = aiReport!['overallRiskScore'] ?? 0;
     final color = score >= 70
         ? Colors.red.shade300
         : score >= 40
@@ -238,7 +235,6 @@ class _HealthVitalAITrendCWState extends State<HealthVitalAITrendCW> {
       child: SingleChildScrollView(
         child: Column(
           children: [
-            // RISK SCORE CARD
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(14),
@@ -247,63 +243,48 @@ class _HealthVitalAITrendCWState extends State<HealthVitalAITrendCW> {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Text(
-                "Health Risk Score: $score / 100",
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
+                'Health Risk Score: $score / 100',
+                style:
+                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
             ),
-
             const SizedBox(height: 14),
-
-            // TREND SUMMARY
             _aiCard(
-              title: "Trend Summary",
-              content: aiReport!["trendSummary"],
+              title: 'Trend Summary',
+              content: aiReport!['trendSummary'],
               icon: Icons.trending_up_rounded,
               color: Colors.blue.shade100,
             ),
-
-            // FALL RISK
             _aiCard(
-              title: "Fall Risk",
+              title: 'Fall Risk',
               content:
-                  "Estimated Fall Risk: ${(aiReport!["fallRisk"] * 100).toStringAsFixed(1)}%",
-              icon: Icons.falling_rounded,
+                  'Estimated Fall Risk: ${(aiReport!['fallRisk'] * 100).toStringAsFixed(1)}%',
+              icon: Icons.warning_amber_rounded,
               color: Colors.orange.shade100,
             ),
-
-            // HEART RISK
             _aiCard(
-              title: "Heart Event Risk",
+              title: 'Heart Event Risk',
               content:
-                  "Estimated Heart Risk: ${(aiReport!["heartRisk"] * 100).toStringAsFixed(1)}%",
+                  'Estimated Heart Risk: ${(aiReport!['heartRisk'] * 100).toStringAsFixed(1)}%',
               icon: Icons.favorite_rounded,
               color: Colors.red.shade100,
             ),
-
-            // WANDERING RISK
             _aiCard(
-              title: "Wandering Risk",
+              title: 'Wandering Risk',
               content:
-                  "Estimated Wandering Risk: ${(aiReport!["wanderingRisk"] * 100).toStringAsFixed(1)}%",
+                  'Estimated Wandering Risk: ${(aiReport!['wanderingRisk'] * 100).toStringAsFixed(1)}%',
               icon: Icons.directions_walk_rounded,
               color: Colors.green.shade100,
             ),
-
-            // CAREGIVER GUIDANCE
             _aiCard(
-              title: "Caregiver Guidance",
-              content: aiReport!["caregiverGuidance"],
+              title: 'Caregiver Guidance',
+              content: aiReport!['caregiverGuidance'],
               icon: Icons.support_agent,
               color: Colors.purple.shade100,
             ),
-
-            // SENIOR SUMMARY
             _aiCard(
-              title: "Senior Summary",
-              content: aiReport!["seniorSummary"],
+              title: 'Senior Summary',
+              content: aiReport!['seniorSummary'],
               icon: Icons.elderly_rounded,
               color: Colors.teal.shade100,
             ),
@@ -314,7 +295,7 @@ class _HealthVitalAITrendCWState extends State<HealthVitalAITrendCW> {
   }
 
   // ------------------------------------------------------------------
-  // Reusable AI card
+  // AI CARD
   // ------------------------------------------------------------------
   Widget _aiCard({
     required String title,
@@ -334,22 +315,17 @@ class _HealthVitalAITrendCWState extends State<HealthVitalAITrendCW> {
         children: [
           Row(
             children: [
-              Icon(icon, size: 30),
+              Icon(icon),
               const SizedBox(width: 10),
-              Text(
-                title,
-                style:
-                    const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 10),
-          Text(content, style: const TextStyle(fontSize: 16)),
+          Text(content),
         ],
       ),
     );
   }
 }
-
-// Set your widget name, define your parameter, and then add the
-// boilerplate code using the green button on the right!

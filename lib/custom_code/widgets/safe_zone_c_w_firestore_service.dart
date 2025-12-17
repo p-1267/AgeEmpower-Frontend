@@ -11,20 +11,10 @@ import 'package:flutter/material.dart';
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'dart:async';
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:location/location.dart';
-
-/// ---------------------------------------------------------------------------
-/// SafeZoneCWFirestoreService
-/// Provides Firestore + location-powered features for Safe Zones:
-/// - Create Zone
-/// - Read Zones
-/// - Update Zone
-/// - Delete Zone
-/// - Check if user is inside zone
-/// - Trigger emergency alert if outside zone
-/// ---------------------------------------------------------------------------
 
 class SafeZoneCWFirestoreService extends StatefulWidget {
   const SafeZoneCWFirestoreService({
@@ -38,17 +28,12 @@ class SafeZoneCWFirestoreService extends StatefulWidget {
   State<SafeZoneCWFirestoreService> createState() =>
       _SafeZoneCWFirestoreServiceState();
 
-  /// Allows any child widget to access this service
   static _SafeZoneService? of(BuildContext context) {
     final inherited =
         context.dependOnInheritedWidgetOfExactType<_SafeZoneServiceInherited>();
     return inherited?.service;
   }
 }
-
-/// ---------------------------------------------------------------------------
-/// INTERNAL SERVICE CLASS
-/// ---------------------------------------------------------------------------
 
 class _SafeZoneService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -57,9 +42,6 @@ class _SafeZoneService {
 
   String? get uid => _auth.currentUser?.uid;
 
-  // -----------------------------------------------------
-  // CRUD: CREATE SAFE ZONE
-  // -----------------------------------------------------
   Future<String> createZone({
     required String name,
     required GeoPoint center,
@@ -78,19 +60,12 @@ class _SafeZoneService {
     return id;
   }
 
-  // -----------------------------------------------------
-  // READ ALL SAFE ZONES
-  // -----------------------------------------------------
   Future<List<Map<String, dynamic>>> readZones() async {
     final snap =
         await _db.collection('users').doc(uid).collection('safeZones').get();
-
     return snap.docs.map((e) => e.data()).toList();
   }
 
-  // -----------------------------------------------------
-  // UPDATE SAFE ZONE
-  // -----------------------------------------------------
   Future<void> updateZone({
     required String zoneId,
     required String name,
@@ -109,9 +84,6 @@ class _SafeZoneService {
     });
   }
 
-  // -----------------------------------------------------
-  // DELETE SAFE ZONE
-  // -----------------------------------------------------
   Future<void> deleteZone(String zoneId) async {
     await _db
         .collection('users')
@@ -121,9 +93,6 @@ class _SafeZoneService {
         .delete();
   }
 
-  // -----------------------------------------------------
-  // GET CURRENT USER LOCATION
-  // -----------------------------------------------------
   Future<GeoPoint?> getUserLocation() async {
     bool enabled = await _location.serviceEnabled();
     if (!enabled) enabled = await _location.requestService();
@@ -139,10 +108,6 @@ class _SafeZoneService {
     return GeoPoint(loc.latitude!, loc.longitude!);
   }
 
-  // -----------------------------------------------------
-  // CHECK IF LOCATION IS INSIDE ZONE
-  // Haversine distance calculation
-  // -----------------------------------------------------
   bool isInsideZone({
     required GeoPoint userLocation,
     required GeoPoint center,
@@ -150,7 +115,7 @@ class _SafeZoneService {
   }) {
     const double earthRadius = 6371000;
 
-    double toRadians(double degree) => degree * 3.141592653589793 / 180;
+    double toRadians(double degree) => degree * pi / 180;
 
     final lat1 = toRadians(userLocation.latitude);
     final lon1 = toRadians(userLocation.longitude);
@@ -169,9 +134,6 @@ class _SafeZoneService {
     return distance <= radiusMeters;
   }
 
-  // -----------------------------------------------------
-  // TRIGGER WANDERING ALERT
-  // -----------------------------------------------------
   Future<void> triggerWanderingAlert({
     required String zoneId,
     required GeoPoint lastLocation,
@@ -188,7 +150,6 @@ class _SafeZoneService {
       "resolved": false,
     });
 
-    // Notify caregivers automatically
     await _db.collection('notifications').add({
       "toUser": uid,
       "type": "wandering",
@@ -198,10 +159,6 @@ class _SafeZoneService {
     });
   }
 }
-
-/// ---------------------------------------------------------------------------
-/// INHERITED WIDGET WRAPPER
-/// ---------------------------------------------------------------------------
 
 class _SafeZoneServiceInherited extends InheritedWidget {
   final _SafeZoneService service;
@@ -214,10 +171,6 @@ class _SafeZoneServiceInherited extends InheritedWidget {
   @override
   bool updateShouldNotify(_) => false;
 }
-
-/// ---------------------------------------------------------------------------
-/// SERVICE PROVIDER STATE
-/// ---------------------------------------------------------------------------
 
 class _SafeZoneCWFirestoreServiceState
     extends State<SafeZoneCWFirestoreService> {
@@ -237,6 +190,3 @@ class _SafeZoneCWFirestoreServiceState
     );
   }
 }
-
-// Set your widget name, define your parameter, and then add the
-// boilerplate code using the green button on the right!

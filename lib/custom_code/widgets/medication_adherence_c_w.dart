@@ -10,256 +10,253 @@ import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
-// AUTOMATIC FLUTTERFLOW IMPORTS — DO NOT REMOVE
 import '/custom_code/widgets/index.dart';
 import '/custom_code/actions/index.dart';
 import '/flutter_flow/custom_functions.dart';
 
-// CUSTOM IMPORTS
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 
 class MedicationAdherenceCW extends StatefulWidget {
-  final double? width;
-  final double? height;
-
-  final String medId;
-
   const MedicationAdherenceCW({
-    Key? key,
-    this.width,
-    this.height,
-    required this.medId,
-  }) : super(key: key);
+    super.key,
+    required this.medicationRef,
+  });
+
+  final DocumentReference medicationRef;
 
   @override
   State<MedicationAdherenceCW> createState() => _MedicationAdherenceCWState();
 }
 
 class _MedicationAdherenceCWState extends State<MedicationAdherenceCW> {
-  final String _aiUrl =
-      "https://YOUR_BACKEND_DOMAIN.com/api/ai/medications/adherence-insights";
+  late final DocumentReference<Map<String, dynamic>> _medRef;
+  late final CollectionReference<Map<String, dynamic>> _logsRef;
 
-  bool _loading = false;
-  String? _insight;
-  int _taken = 0;
-  int _missed = 0;
-  double _score = 0; // 0–100
+  @override
+  void initState() {
+    super.initState();
+    _medRef = widget.medicationRef.withConverter<Map<String, dynamic>>(
+      fromFirestore: (s, _) => (s.data() ?? {}),
+      toFirestore: (m, _) => m,
+    );
+    _logsRef = _medRef.collection('adherenceLogs');
+  }
+
+  DateTime _startOfDay(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  Future<void> _markTakenNow(Map<String, dynamic> med) async {
+    final now = DateTime.now();
+    final today = _startOfDay(now);
+
+    final int dailyDose =
+        (med['dailyDose'] is num) ? (med['dailyDose'] as num).toInt() : 1;
+
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final medSnap = await tx.get(_medRef);
+      final medData = medSnap.data() ?? {};
+
+      final int takenToday = (medData['takenToday'] is num)
+          ? (medData['takenToday'] as num).toInt()
+          : 0;
+      if (takenToday >= dailyDose) {
+        return; // already complete for today
+      }
+
+      // Write a log entry
+      final newLog = _logsRef.doc();
+      tx.set(newLog, {
+        'timestamp': FieldValue.serverTimestamp(),
+        'takenAtLocalMs': now.millisecondsSinceEpoch,
+        'dayKey': '${today.year}-${today.month}-${today.day}',
+        'type': 'taken',
+      });
+
+      tx.update(_medRef, {
+        'takenToday': takenToday + 1,
+        'lastTakenAt': FieldValue.serverTimestamp(),
+        'lastTakenAtLocalMs': now.millisecondsSinceEpoch,
+      });
+    });
+  }
+
+  Future<void> _resetTakenIfNewDay(
+      DocumentSnapshot<Map<String, dynamic>> snap) async {
+    final data = snap.data() ?? {};
+    final int lastDayMs = (data['takenDayLocalMs'] is num)
+        ? (data['takenDayLocalMs'] as num).toInt()
+        : 0;
+    final now = DateTime.now();
+    final todayStart = _startOfDay(now).millisecondsSinceEpoch;
+
+    if (lastDayMs == 0) {
+      // initialize
+      await _medRef
+          .set({'takenDayLocalMs': todayStart}, SetOptions(merge: true));
+      return;
+    }
+
+    if (lastDayMs != todayStart) {
+      await _medRef.set({
+        'takenToday': 0,
+        'takenDayLocalMs': todayStart,
+      }, SetOptions(merge: true));
+    }
+  }
+
+  String _formatTime(DateTime dt) {
+    final h = dt.hour.toString().padLeft(2, '0');
+    final m = dt.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final w = widget.width ?? MediaQuery.of(context).size.width;
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final theme = FlutterFlowTheme.of(context);
 
-    if (uid == null) {
-      return const Text("Please sign in.");
-    }
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: _medRef.snapshots(),
+      builder: (context, medSnap) {
+        if (!medSnap.hasData) {
+          return _card(theme,
+              child: const Center(child: CircularProgressIndicator()));
+        }
 
-    return SizedBox(
-      width: w,
-      child: Card(
-        elevation: 3,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+        final med = medSnap.data!.data() ?? {};
+        // Day rollover safety
+        _resetTakenIfNewDay(medSnap.data!);
+
+        final int dailyDose =
+            (med['dailyDose'] is num) ? (med['dailyDose'] as num).toInt() : 1;
+        final int takenToday =
+            (med['takenToday'] is num) ? (med['takenToday'] as num).toInt() : 0;
+
+        final lastTakenLocalMs = (med['lastTakenAtLocalMs'] is num)
+            ? (med['lastTakenAtLocalMs'] as num).toInt()
+            : 0;
+        final DateTime? lastTaken = lastTakenLocalMs > 0
+            ? DateTime.fromMillisecondsSinceEpoch(lastTakenLocalMs)
+            : null;
+
+        final double pct =
+            dailyDose <= 0 ? 0 : (takenToday / dailyDose).clamp(0, 1);
+
+        return _card(
+          theme,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                "Adherence Summary",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              Text('Adherence', style: theme.titleMedium),
               const SizedBox(height: 8),
-              _buildStats(uid),
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.analytics),
-                label: const Text("Generate AI Insights"),
-                onPressed: () => _runAI(uid),
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 48),
-                ),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Today', style: theme.bodyMedium),
+                        const SizedBox(height: 4),
+                        Text('$takenToday / $dailyDose doses',
+                            style: theme.headlineSmall
+                                .copyWith(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 6),
+                        if (lastTaken != null)
+                          Text('Last taken: ${_formatTime(lastTaken)}',
+                              style: theme.bodySmall
+                                  .copyWith(color: theme.secondaryText)),
+                      ],
+                    ),
+                  ),
+                  SizedBox(
+                    width: 54,
+                    height: 54,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        CircularProgressIndicator(value: pct, strokeWidth: 6),
+                        Text('${(pct * 100).round()}%', style: theme.bodySmall),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              if (_loading) const Center(child: CircularProgressIndicator()),
-              if (!_loading && _insight != null) _buildAI(),
+
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: takenToday >= dailyDose
+                          ? null
+                          : () => _markTakenNow(med),
+                      child: Text(takenToday >= dailyDose
+                          ? 'Done for today'
+                          : 'Mark dose taken'),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // Recent logs (lightweight)
+              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: _logsRef
+                    .orderBy('takenAtLocalMs', descending: true)
+                    .limit(5)
+                    .snapshots(),
+                builder: (context, logsSnap) {
+                  if (!logsSnap.hasData) return const SizedBox.shrink();
+                  final docs = logsSnap.data!.docs;
+                  if (docs.isEmpty) {
+                    return Text('No recent logs',
+                        style: theme.bodySmall
+                            .copyWith(color: theme.secondaryText));
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Recent', style: theme.bodyMedium),
+                      const SizedBox(height: 6),
+                      ...docs.map((d) {
+                        final m = d.data();
+                        final ms = (m['takenAtLocalMs'] is num)
+                            ? (m['takenAtLocalMs'] as num).toInt()
+                            : 0;
+                        final dt = ms > 0
+                            ? DateTime.fromMillisecondsSinceEpoch(ms)
+                            : null;
+                        final label = dt == null
+                            ? 'Dose taken'
+                            : 'Dose taken at ${_formatTime(dt)}';
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text('• $label', style: theme.bodySmall),
+                        );
+                      }),
+                    ],
+                  );
+                },
+              ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  // ----------------------------------------------------------
-  // 1. Load adherence stats
-  // ----------------------------------------------------------
-
-  Widget _buildStats(String uid) {
-    final ref = FirebaseFirestore.instance
-        .collection("users")
-        .doc(uid)
-        .collection("medications")
-        .doc(widget.medId)
-        .collection("adherence")
-        .orderBy("timestamp", descending: true)
-        .limit(50);
-
-    return StreamBuilder<QuerySnapshot>(
-      stream: ref.snapshots(),
-      builder: (ctx, snap) {
-        if (!snap.hasData) {
-          return const Padding(
-            padding: EdgeInsets.all(12),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        final docs = snap.data!.docs;
-
-        if (docs.isEmpty) {
-          _score = 0;
-          return const Text("No doses logged yet.");
-        }
-
-        _taken = docs.where((d) => d["status"] == "taken").length;
-        _missed = docs.where((d) => d["status"] == "missed").length;
-
-        final total = _taken + _missed;
-        _score = total == 0 ? 0 : (_taken / total) * 100;
-
-        Color scoreColor = Colors.green;
-        if (_score < 50)
-          scoreColor = Colors.red;
-        else if (_score < 75) scoreColor = Colors.orange;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Past 50 doses:",
-              style: TextStyle(fontSize: 15, color: Colors.grey.shade800),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _statBox("Taken", _taken.toString(), Colors.green),
-                _statBox("Missed", _missed.toString(), Colors.red),
-                _statBox("Score", "${_score.toInt()}%", scoreColor),
-              ],
-            ),
-          ],
         );
       },
     );
   }
 
-  Widget _statBox(String label, String value, Color color) {
+  Widget _card(FlutterFlowTheme theme, {required Widget child}) {
     return Container(
-      width: 100,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: color.withOpacity(.12),
-        border: Border.all(color: color),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Text(label,
-              style: TextStyle(
-                  fontWeight: FontWeight.w600, color: color, fontSize: 14)),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ----------------------------------------------------------
-  // 2. AI Insights
-  // ----------------------------------------------------------
-
-  Widget _buildAI() {
-    return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(10),
+        color: theme.secondaryBackground,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: theme.alternate),
       ),
-      child: Text(
-        _insight ?? "",
-        style: const TextStyle(fontSize: 15),
-      ),
+      child: child,
     );
   }
-
-  Future<void> _runAI(String uid) async {
-    setState(() {
-      _loading = true;
-      _insight = null;
-    });
-
-    // GET last 30 adherence entries
-    final snap = await FirebaseFirestore.instance
-        .collection("users")
-        .doc(uid)
-        .collection("medications")
-        .doc(widget.medId)
-        .collection("adherence")
-        .orderBy("timestamp", descending: true)
-        .limit(30)
-        .get();
-
-    final entries = snap.docs
-        .map((d) => {
-              "status": d["status"],
-              "doseTime": d["doseTime"],
-            })
-        .toList();
-
-    try {
-      final resp = await http.post(
-        Uri.parse(_aiUrl),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "adherence": entries,
-        }),
-      );
-
-      if (resp.statusCode != 200) {
-        _showToast("AI error ${resp.statusCode}");
-        setState(() => _loading = false);
-        return;
-      }
-
-      final json = jsonDecode(resp.body);
-
-      setState(() {
-        _insight = json["insight"] ?? "";
-        _loading = false;
-      });
-    } catch (e) {
-      _showToast("Error: $e");
-      setState(() => _loading = false);
-    }
-  }
-
-  void _showToast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
 }
-
-// Set your widget name, define your parameter, and then add the
-// boilerplate code using the green button on the right!

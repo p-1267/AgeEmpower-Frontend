@@ -10,12 +10,23 @@ import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
+import '/custom_code/widgets/index.dart';
+import '/custom_code/actions/index.dart';
+import '/flutter_flow/custom_functions.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'EmergencyAISummaryWidget.dart';
+import 'emergency_a_i_summary_widget.dart';
 
 class AgencyEmergencyConsoleCW extends StatefulWidget {
-  const AgencyEmergencyConsoleCW({super.key});
+  const AgencyEmergencyConsoleCW({
+    super.key,
+    this.width,
+    this.height,
+  });
+
+  final double? width;
+  final double? height;
 
   @override
   State<AgencyEmergencyConsoleCW> createState() =>
@@ -36,42 +47,45 @@ class _AgencyEmergencyConsoleCWState extends State<AgencyEmergencyConsoleCW> {
     if (agencyId == null) {
       return const Center(
         child: Text(
-          "No agency account detected",
+          'No agency account detected',
           style: TextStyle(fontSize: 18),
         ),
       );
     }
 
-    return Column(
-      children: [
-        _buildHeader(),
-        Expanded(child: _buildEmergencyStream()),
-      ],
-    );
-  }
-
-  // ----------------------------------------------------------------------
-  // HEADER (Agency Title + Filters Placeholder)
-  // ----------------------------------------------------------------------
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.all(14.0),
-      child: Row(
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: Column(
         children: [
-          const Icon(Icons.business, size: 36),
-          const SizedBox(width: 10),
-          const Text(
-            "Agency Emergency Console",
-            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-          ),
-          const Spacer(),
+          _buildHeader(),
+          Expanded(child: _buildEmergencyStream()),
         ],
       ),
     );
   }
 
   // ----------------------------------------------------------------------
-  // REALTIME STREAM OF ALL EMERGENCIES FOR THE AGENCY
+  // HEADER
+  // ----------------------------------------------------------------------
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: const [
+          Icon(Icons.business, size: 36),
+          SizedBox(width: 10),
+          Text(
+            'Agency Emergency Console',
+            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ----------------------------------------------------------------------
+  // STREAM
   // ----------------------------------------------------------------------
   Widget _buildEmergencyStream() {
     return StreamBuilder<QuerySnapshot>(
@@ -90,17 +104,17 @@ class _AgencyEmergencyConsoleCWState extends State<AgencyEmergencyConsoleCW> {
 
         return FutureBuilder<List<Map<String, dynamic>>>(
           future: _filterAgencyEvents(events),
-          builder: (context, agencyEventsSnap) {
-            if (!agencyEventsSnap.hasData) {
+          builder: (context, filtered) {
+            if (!filtered.hasData) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            final agencyEvents = agencyEventsSnap.data!;
+            final agencyEvents = filtered.data!;
 
             if (agencyEvents.isEmpty) {
               return const Center(
                 child: Text(
-                  "No emergencies reported for this agency.",
+                  'No emergencies reported for this agency.',
                   style: TextStyle(fontSize: 18),
                 ),
               );
@@ -118,25 +132,26 @@ class _AgencyEmergencyConsoleCWState extends State<AgencyEmergencyConsoleCW> {
   }
 
   // ----------------------------------------------------------------------
-  // FILTER EVENTS BY AGENCY ASSIGNMENT
+  // FILTER BY AGENCY
   // ----------------------------------------------------------------------
   Future<List<Map<String, dynamic>>> _filterAgencyEvents(
-      List<Map<String, dynamic>> events) async {
-    List<Map<String, dynamic>> result = [];
+    List<Map<String, dynamic>> events,
+  ) async {
+    final List<Map<String, dynamic>> result = [];
 
     for (final e in events) {
-      final userId = e["userId"];
+      final userId = e['userId'];
       if (userId == null) continue;
 
       final snap = await FirebaseFirestore.instance
-          .collection("users")
+          .collection('users')
           .doc(userId)
           .get();
 
       final data = snap.data();
       if (data == null) continue;
 
-      if (data["agency"] == agencyId) {
+      if (data['agency'] == agencyId) {
         result.add(e);
       }
     }
@@ -145,24 +160,24 @@ class _AgencyEmergencyConsoleCWState extends State<AgencyEmergencyConsoleCW> {
   }
 
   // ----------------------------------------------------------------------
-  // BUILD EMERGENCY CARD
+  // CARD
   // ----------------------------------------------------------------------
   Widget _buildEmergencyCard(Map<String, dynamic> event) {
-    final String type = (event["type"] ?? "sos").toString();
-    final bool resolved = event["resolved"] == true;
-    final String eventId = event["eventId"] ?? "";
-    final Timestamp? ts = event["timestamp"];
-    final location = event["location"];
+    final String type = (event['type'] ?? 'sos').toString();
+    final bool resolved = event['resolved'] == true;
+    final String eventId = event['eventId'] ?? '';
+    final Timestamp? ts = event['timestamp'];
+    final location = event['location'];
 
     IconData icon;
     Color color;
 
     switch (type) {
-      case "fall_detected":
-        icon = Icons.falling;
+      case 'fall_detected':
+        icon = Icons.warning_amber_rounded;
         color = Colors.orange;
         break;
-      case "wandering_alert":
+      case 'wandering_alert':
         icon = Icons.directions_walk;
         color = Colors.blue;
         break;
@@ -177,19 +192,21 @@ class _AgencyEmergencyConsoleCWState extends State<AgencyEmergencyConsoleCW> {
       decoration: BoxDecoration(
         color: resolved ? Colors.grey.shade200 : color.withOpacity(0.15),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: resolved ? Colors.grey : color, width: 2),
+        border: Border.all(
+          color: resolved ? Colors.grey : color,
+          width: 2,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // TITLE BAR
           Row(
             children: [
               Icon(icon, size: 40, color: color),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  resolved ? "RESOLVED" : type.toUpperCase(),
+                  resolved ? 'RESOLVED' : type.toUpperCase(),
                   style: TextStyle(
                     color: resolved ? Colors.grey : color,
                     fontSize: 20,
@@ -199,21 +216,15 @@ class _AgencyEmergencyConsoleCWState extends State<AgencyEmergencyConsoleCW> {
               ),
             ],
           ),
-
           const SizedBox(height: 12),
-
-          Text("Event ID: $eventId"),
-          if (ts != null) Text("Time: ${ts.toDate()}"),
-
+          Text('Event ID: $eventId'),
+          if (ts != null) Text('Time: ${ts.toDate()}'),
           if (location != null)
             Text(
-              "Location: ${location.latitude}, ${location.longitude}",
+              'Location: ${location.latitude.toStringAsFixed(5)}, ${location.longitude.toStringAsFixed(5)}',
               style: const TextStyle(fontSize: 14),
             ),
-
           const SizedBox(height: 14),
-
-          // ACTION BUTTONS
           Row(
             children: [
               if (!resolved)
@@ -222,7 +233,7 @@ class _AgencyEmergencyConsoleCWState extends State<AgencyEmergencyConsoleCW> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                   ),
-                  child: const Text("Resolve"),
+                  child: const Text('Resolve'),
                 ),
               const SizedBox(width: 10),
               ElevatedButton(
@@ -230,15 +241,7 @@ class _AgencyEmergencyConsoleCWState extends State<AgencyEmergencyConsoleCW> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.deepPurple,
                 ),
-                child: const Text("AI Summary"),
-              ),
-              const SizedBox(width: 10),
-              ElevatedButton(
-                onPressed: () => _viewLocation(location),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueGrey,
-                ),
-                child: const Text("Location"),
+                child: const Text('AI Summary'),
               ),
             ],
           ),
@@ -248,18 +251,15 @@ class _AgencyEmergencyConsoleCWState extends State<AgencyEmergencyConsoleCW> {
   }
 
   // ----------------------------------------------------------------------
-  // ACTION: MARK RESOLVED
+  // ACTIONS
   // ----------------------------------------------------------------------
   Future<void> _markResolved(String eventId) async {
     await FirebaseFirestore.instance
         .collection('emergencies')
         .doc(eventId)
-        .update({"resolved": true});
+        .update({'resolved': true});
   }
 
-  // ----------------------------------------------------------------------
-  // ACTION: AI SUMMARY
-  // ----------------------------------------------------------------------
   void _openAISummary(String eventId) {
     showDialog(
       context: context,
@@ -272,25 +272,4 @@ class _AgencyEmergencyConsoleCWState extends State<AgencyEmergencyConsoleCW> {
       ),
     );
   }
-
-  // ----------------------------------------------------------------------
-  // ACTION: LOCATION VIEWER
-  // ----------------------------------------------------------------------
-  void _viewLocation(dynamic loc) {
-    if (loc == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Location unavailable")),
-      );
-      return;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-            "Location: ${loc.latitude.toStringAsFixed(5)}, ${loc.longitude.toStringAsFixed(5)}"),
-      ),
-    );
-  }
 }
-
-// Set your widget name, define your parameter, and then add the
-// boilerplate code using the green button on the right!

@@ -10,11 +10,22 @@ import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
+import '/custom_code/widgets/index.dart';
+import '/custom_code/actions/index.dart';
+import '/flutter_flow/custom_functions.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'EmergencyAISummaryWidget.dart';
+import 'emergency_a_i_summary_widget.dart';
 
 class EmergencyHistoryViewerCW extends StatefulWidget {
-  const EmergencyHistoryViewerCW({super.key});
+  const EmergencyHistoryViewerCW({
+    super.key,
+    this.width,
+    this.height,
+  });
+
+  final double? width;
+  final double? height;
 
   @override
   State<EmergencyHistoryViewerCW> createState() =>
@@ -22,32 +33,35 @@ class EmergencyHistoryViewerCW extends StatefulWidget {
 }
 
 class _EmergencyHistoryViewerCWState extends State<EmergencyHistoryViewerCW> {
-  String filter = "all";
-  String search = "";
+  String filter = 'all';
+  String search = '';
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _buildHeader(),
-        Expanded(child: _buildHistoryStream()),
-      ],
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: Column(
+        children: [
+          _buildHeader(),
+          Expanded(child: _buildHistoryStream()),
+        ],
+      ),
     );
   }
 
   // --------------------------------------------------------------------
-  // HEADER UI: FILTERS + SEARCH
+  // HEADER
   // --------------------------------------------------------------------
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.all(14.0),
+      padding: const EdgeInsets.all(14),
       child: Column(
         children: [
-          // SEARCH BAR
           TextField(
             decoration: InputDecoration(
               prefixIcon: const Icon(Icons.search),
-              hintText: "Search emergencies…",
+              hintText: 'Search emergencies…',
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
@@ -55,18 +69,16 @@ class _EmergencyHistoryViewerCWState extends State<EmergencyHistoryViewerCW> {
             onChanged: (v) => setState(() => search = v.trim().toLowerCase()),
           ),
           const SizedBox(height: 14),
-
-          // FILTER BUTTONS
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _filterButton("all", "All"),
-                _filterButton("sos", "SOS"),
-                _filterButton("fall", "Fall"),
-                _filterButton("wandering", "Wandering"),
-                _filterButton("resolved", "Resolved"),
-                _filterButton("active", "Active"),
+                _filterButton('all', 'All'),
+                _filterButton('sos', 'SOS'),
+                _filterButton('fall', 'Fall'),
+                _filterButton('wandering', 'Wandering'),
+                _filterButton('resolved', 'Resolved'),
+                _filterButton('active', 'Active'),
               ],
             ),
           ),
@@ -76,8 +88,7 @@ class _EmergencyHistoryViewerCWState extends State<EmergencyHistoryViewerCW> {
   }
 
   Widget _filterButton(String value, String label) {
-    final bool selected = filter == value;
-
+    final selected = filter == value;
     return Padding(
       padding: const EdgeInsets.only(right: 10),
       child: ChoiceChip(
@@ -112,10 +123,7 @@ class _EmergencyHistoryViewerCWState extends State<EmergencyHistoryViewerCW> {
 
         if (events.isEmpty) {
           return const Center(
-            child: Text(
-              "No matching emergency history.",
-              style: TextStyle(fontSize: 18),
-            ),
+            child: Text('No matching emergency history.'),
           );
         }
 
@@ -129,57 +137,55 @@ class _EmergencyHistoryViewerCWState extends State<EmergencyHistoryViewerCW> {
   }
 
   // --------------------------------------------------------------------
-  // SEARCH + FILTER LOGIC
+  // SEARCH + FILTER
   // --------------------------------------------------------------------
   List<Map<String, dynamic>> _applySearch(List<Map<String, dynamic>> events) {
     if (search.isEmpty) return events;
-
     return events.where((e) {
-      final id = (e["eventId"] ?? "").toString().toLowerCase();
-      final type = (e["type"] ?? "").toString().toLowerCase();
+      final id = (e['eventId'] ?? '').toString().toLowerCase();
+      final type = (e['type'] ?? '').toString().toLowerCase();
       return id.contains(search) || type.contains(search);
     }).toList();
   }
 
   List<Map<String, dynamic>> _applyFilter(List<Map<String, dynamic>> events) {
     switch (filter) {
-      case "sos":
-        return events.where((e) => e["type"] == "sos").toList();
-      case "fall":
-        return events.where((e) => e["type"] == "fall_detected").toList();
-      case "wandering":
-        return events.where((e) => e["type"] == "wandering_alert").toList();
-      case "resolved":
-        return events.where((e) => e["resolved"] == true).toList();
-      case "active":
-        return events.where((e) => e["resolved"] != true).toList();
+      case 'sos':
+        return events.where((e) => e['type'] == 'sos').toList();
+      case 'fall':
+        return events.where((e) => e['type'] == 'fall_detected').toList();
+      case 'wandering':
+        return events.where((e) => e['type'] == 'wandering_alert').toList();
+      case 'resolved':
+        return events.where((e) => e['resolved'] == true).toList();
+      case 'active':
+        return events.where((e) => e['resolved'] != true).toList();
       default:
         return events;
     }
   }
 
   // --------------------------------------------------------------------
-  // EVENT CARD UI
+  // EVENT CARD
   // --------------------------------------------------------------------
   Widget _buildEventCard(Map<String, dynamic> event) {
-    final bool resolved = event["resolved"] == true;
-    final String type = event["type"] ?? "emergency";
-    final Timestamp? time = event["timestamp"];
-    final String eventId = event["eventId"] ?? "";
+    final bool resolved = event['resolved'] == true;
+    final String type = event['type'] ?? 'emergency';
+    final Timestamp? time = event['timestamp'];
+    final String eventId = event['eventId'] ?? '';
 
     IconData icon;
     Color color;
 
     switch (type) {
-      case "fall_detected":
-        icon = Icons.falling;
+      case 'fall_detected':
+        icon = Icons.warning_amber_rounded;
         color = Colors.orange;
         break;
-      case "wandering_alert":
+      case 'wandering_alert':
         icon = Icons.directions_walk;
         color = Colors.blue;
         break;
-      case "sos":
       default:
         icon = Icons.warning_rounded;
         color = Colors.red;
@@ -199,7 +205,6 @@ class _EmergencyHistoryViewerCWState extends State<EmergencyHistoryViewerCW> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // TITLE + ICON
           Row(
             children: [
               Icon(icon, size: 40, color: color),
@@ -207,8 +212,8 @@ class _EmergencyHistoryViewerCWState extends State<EmergencyHistoryViewerCW> {
               Expanded(
                 child: Text(
                   resolved
-                      ? "RESOLVED EVENT"
-                      : type.replaceAll("_", " ").toUpperCase(),
+                      ? 'RESOLVED EVENT'
+                      : type.replaceAll('_', ' ').toUpperCase(),
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -219,24 +224,13 @@ class _EmergencyHistoryViewerCWState extends State<EmergencyHistoryViewerCW> {
             ],
           ),
           const SizedBox(height: 12),
-
-          // DETAILS
-          Text("Event ID: $eventId"),
-          if (time != null) Text("Time: ${time.toDate()}"),
-
+          Text('Event ID: $eventId'),
+          if (time != null) Text('Time: ${time.toDate()}'),
           const SizedBox(height: 14),
-
-          // ACTION BUTTONS
-          Row(
-            children: [
-              ElevatedButton(
-                onPressed: () => _showAISummary(eventId),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
-                ),
-                child: const Text("AI Summary"),
-              ),
-            ],
+          ElevatedButton(
+            onPressed: () => _showAISummary(eventId),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
+            child: const Text('AI Summary'),
           ),
         ],
       ),
@@ -244,7 +238,7 @@ class _EmergencyHistoryViewerCWState extends State<EmergencyHistoryViewerCW> {
   }
 
   // --------------------------------------------------------------------
-  // OPEN AI SUMMARY
+  // AI SUMMARY
   // --------------------------------------------------------------------
   void _showAISummary(String eventId) {
     showDialog(
@@ -259,6 +253,3 @@ class _EmergencyHistoryViewerCWState extends State<EmergencyHistoryViewerCW> {
     );
   }
 }
-
-// Set your widget name, define your parameter, and then add the
-// boilerplate code using the green button on the right!

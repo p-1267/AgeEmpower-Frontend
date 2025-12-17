@@ -10,52 +10,48 @@ import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
-// DO NOT REMOVE ABOVE
-
 import '/custom_code/widgets/index.dart';
+import '/custom_code/actions/index.dart';
+import '/flutter_flow/custom_functions.dart';
 
 class AutoScaffoldCW extends StatelessWidget {
-  final Widget content;
-  final String? title;
-  final bool showBack;
-
   const AutoScaffoldCW({
     super.key,
     required this.content,
+    this.width,
+    this.height,
     this.title,
     this.showBack = false,
   });
 
+  final Widget content;
+  final double? width;
+  final double? height;
+  final String? title;
+  final bool showBack;
+
   @override
   Widget build(BuildContext context) {
-    final controller = GlobalAppControllerCW.of(context);
-    final engine = ResponsiveLayoutEngineCW.of(context);
-
-    return AppThemeCW(
-      role: controller.role,
-      themeSettings: controller.themeSettings,
-      child: ResponsiveLayoutEngineCW(
-        child: MultiDeviceAppShellCW(
-          content: Column(
-            children: [
-              AutoHeaderCW(
-                title: title,
-                showBack: showBack,
-              ),
-              Expanded(
-                child: Container(
-                  width: engine.safeWidth,
-                  padding: const EdgeInsets.all(16),
-                  child: content,
-                ),
-              ),
-            ],
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Column(
+        children: [
+          AutoHeaderCW(
+            title: title,
+            showBack: showBack,
+            width: width,
+            height: 64,
           ),
-        ),
+          Expanded(
+            child: Container(
+              width: width,
+              padding: const EdgeInsets.all(16),
+              child: content,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
-
-// Set your widget name, define your parameter, and then add the
-// boilerplate code using the green button on the right!

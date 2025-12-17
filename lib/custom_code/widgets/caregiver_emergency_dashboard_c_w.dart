@@ -10,11 +10,23 @@ import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
+import '/custom_code/widgets/index.dart';
+import '/custom_code/actions/index.dart';
+import '/flutter_flow/custom_functions.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:age_empower/custom_code/widgets/emergency_a_i_summary_widget.dart';
 
 class CaregiverEmergencyDashboardCW extends StatefulWidget {
-  const CaregiverEmergencyDashboardCW({super.key});
+  const CaregiverEmergencyDashboardCW({
+    super.key,
+    this.width,
+    this.height,
+  });
+
+  final double? width;
+  final double? height;
 
   @override
   State<CaregiverEmergencyDashboardCW> createState() =>
@@ -32,7 +44,7 @@ class _CaregiverEmergencyDashboardCWState
   }
 
   // --------------------------------------------------------------------
-  // Determine if caregiver is linked to a specific senior
+  // Determine caregiver linkage
   // --------------------------------------------------------------------
   Future<bool> _isCaregiverForUser(String userId) async {
     final doc =
@@ -40,101 +52,103 @@ class _CaregiverEmergencyDashboardCWState
     final data = doc.data();
     if (data == null) return false;
 
-    final caregivers = data['caregivers'] ?? [];
+    final caregivers = (data['caregivers'] ?? []) as List;
     return caregivers.contains(caregiverId);
   }
 
   // --------------------------------------------------------------------
-  // UI BUILD
+  // UI
   // --------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     if (caregiverId == null) {
       return const Center(
-        child: Text("No caregiver account found."),
+        child: Text('No caregiver account found.'),
       );
     }
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('emergencies')
-          .orderBy('timestamp', descending: true)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('emergencies')
+            .orderBy('timestamp', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-        final allEvents = snapshot.data!.docs;
+          return FutureBuilder<List<Map<String, dynamic>>>(
+            future: _filterEventsForCaregiver(snapshot.data!.docs),
+            builder: (context, filteredSnapshot) {
+              if (!filteredSnapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-        return FutureBuilder<List<Map<String, dynamic>>>(
-          future: _filterEventsForCaregiver(allEvents),
-          builder: (context, filteredSnapshot) {
-            if (!filteredSnapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
+              final events = filteredSnapshot.data!;
 
-            final events = filteredSnapshot.data!;
+              if (events.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'No emergencies detected.',
+                    style: TextStyle(fontSize: 20),
+                  ),
+                );
+              }
 
-            if (events.isEmpty) {
-              return const Center(
-                child: Text(
-                  "No emergencies detected.",
-                  style: TextStyle(fontSize: 20),
-                ),
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: events.length,
+                itemBuilder: (context, index) =>
+                    _buildEmergencyCard(events[index]),
               );
-            }
-
-            return ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: events.length,
-              itemBuilder: (context, index) {
-                return _buildEmergencyCard(events[index]);
-              },
-            );
-          },
-        );
-      },
+            },
+          );
+        },
+      ),
     );
   }
 
   // --------------------------------------------------------------------
-  // Filter events the caregiver is responsible for
+  // Filter events
   // --------------------------------------------------------------------
   Future<List<Map<String, dynamic>>> _filterEventsForCaregiver(
-      List<QueryDocumentSnapshot> docs) async {
-    List<Map<String, dynamic>> results = [];
+    List<QueryDocumentSnapshot> docs,
+  ) async {
+    final List<Map<String, dynamic>> results = [];
 
     for (final doc in docs) {
       final data = doc.data() as Map<String, dynamic>;
+      final userId = data['userId'];
+      if (userId == null) continue;
 
-      final isLinked = await _isCaregiverForUser(data["userId"]);
-      if (isLinked) {
-        results.add(data);
-      }
+      final isLinked = await _isCaregiverForUser(userId);
+      if (isLinked) results.add(data);
     }
 
     return results;
   }
 
   // --------------------------------------------------------------------
-  // EMERGENCY CARD UI
+  // CARD UI
   // --------------------------------------------------------------------
   Widget _buildEmergencyCard(Map<String, dynamic> event) {
-    final bool resolved = event["resolved"] == true;
-    final String type = event["type"] ?? "emergency";
-    final Timestamp? time = event["timestamp"];
-    final String eventId = event["eventId"] ?? "";
+    final bool resolved = event['resolved'] == true;
+    final String type = event['type'] ?? 'emergency';
+    final Timestamp? time = event['timestamp'];
+    final String eventId = event['eventId'] ?? '';
 
     IconData icon;
     Color color;
 
     switch (type) {
-      case "fall_detected":
-        icon = Icons.falling;
+      case 'fall_detected':
+        icon = Icons.warning_amber_rounded; // ✅ FIXED
         color = Colors.orange;
         break;
-      case "wandering_alert":
+      case 'wandering_alert':
         icon = Icons.directions_walk;
         color = Colors.blue;
         break;
@@ -157,7 +171,6 @@ class _CaregiverEmergencyDashboardCWState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ICON + TITLE
           Row(
             children: [
               Icon(icon, size: 40, color: color),
@@ -165,8 +178,8 @@ class _CaregiverEmergencyDashboardCWState
               Expanded(
                 child: Text(
                   resolved
-                      ? "Resolved Emergency"
-                      : "Emergency: $type".toUpperCase(),
+                      ? 'Resolved Emergency'
+                      : 'Emergency: $type'.toUpperCase(),
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -176,23 +189,12 @@ class _CaregiverEmergencyDashboardCWState
               ),
             ],
           ),
-
           const SizedBox(height: 12),
-
-          Text(
-            "Event ID: $eventId",
-            style: const TextStyle(fontSize: 16),
-          ),
-
+          Text('Event ID: $eventId', style: const TextStyle(fontSize: 16)),
           if (time != null)
-            Text(
-              "Time: ${time.toDate()}",
-              style: const TextStyle(fontSize: 16),
-            ),
-
+            Text('Time: ${time.toDate()}',
+                style: const TextStyle(fontSize: 16)),
           const SizedBox(height: 14),
-
-          // ACTION BUTTONS
           Row(
             children: [
               if (!resolved)
@@ -201,7 +203,7 @@ class _CaregiverEmergencyDashboardCWState
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                   ),
-                  child: const Text("Mark Resolved"),
+                  child: const Text('Mark Resolved'),
                 ),
               const SizedBox(width: 10),
               ElevatedButton(
@@ -209,7 +211,7 @@ class _CaregiverEmergencyDashboardCWState
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
                 ),
-                child: const Text("AI Summary"),
+                child: const Text('AI Summary'),
               ),
               const SizedBox(width: 10),
               ElevatedButton(
@@ -217,7 +219,7 @@ class _CaregiverEmergencyDashboardCWState
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.deepPurple,
                 ),
-                child: const Text("Location"),
+                child: const Text('Location'),
               ),
             ],
           ),
@@ -227,22 +229,19 @@ class _CaregiverEmergencyDashboardCWState
   }
 
   // --------------------------------------------------------------------
-  // ACTION: MARK RESOLVED
+  // ACTIONS
   // --------------------------------------------------------------------
   Future<void> _markResolved(String eventId) async {
     await FirebaseFirestore.instance
         .collection('emergencies')
         .doc(eventId)
-        .update({"resolved": true});
+        .update({'resolved': true});
   }
 
-  // --------------------------------------------------------------------
-  // ACTION: OPEN AI SUMMARY
-  // --------------------------------------------------------------------
   void _openSummary(String eventId) {
     showDialog(
       context: context,
-      builder: (c) => Dialog(
+      builder: (_) => Dialog(
         child: SizedBox(
           height: 500,
           width: 350,
@@ -252,26 +251,20 @@ class _CaregiverEmergencyDashboardCWState
     );
   }
 
-  // --------------------------------------------------------------------
-  // ACTION: VIEW LOCATION
-  // --------------------------------------------------------------------
   void _viewLocation(Map<String, dynamic> event) {
-    final loc = event["location"];
+    final loc = event['location'];
     if (loc == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("No location available.")),
+        const SnackBar(content: Text('No location available.')),
       );
       return;
     }
 
-    final lat = loc.latitude;
-    final lon = loc.longitude;
-
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Location: $lat, $lon")),
+      SnackBar(
+        content: Text(
+            'Location: ${loc.latitude.toStringAsFixed(5)}, ${loc.longitude.toStringAsFixed(5)}'),
+      ),
     );
   }
 }
-
-// Set your widget name, define your parameter, and then add the
-// boilerplate code using the green button on the right!

@@ -10,225 +10,178 @@ import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
-// AUTOMATIC FLUTTERFLOW IMPORTS — DO NOT REMOVE
 import '/custom_code/widgets/index.dart';
 import '/custom_code/actions/index.dart';
 import '/flutter_flow/custom_functions.dart';
 
-// CUSTOM IMPORTS
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 
-class MedicationSafetySummaryCW extends StatefulWidget {
-  final double? width;
-  final double? height;
-
+class MedicationSafetySummaryCW extends StatelessWidget {
   const MedicationSafetySummaryCW({
-    Key? key,
-    this.width,
-    this.height,
-  }) : super(key: key);
+    super.key,
+    required this.medicationRef,
+  });
 
-  @override
-  State<MedicationSafetySummaryCW> createState() =>
-      _MedicationSafetySummaryCWState();
-}
+  final DocumentReference medicationRef;
 
-class _MedicationSafetySummaryCWState extends State<MedicationSafetySummaryCW> {
-  final String _aiUrl =
-      "https://YOUR_BACKEND_DOMAIN.com/api/ai/medications/safety-summary";
+  int _asInt(dynamic v, int fallback) => (v is num) ? v.toInt() : fallback;
 
-  bool _loading = false;
-  String? _summary;
-  int? _riskScore;
-  List<dynamic> _recommendations = [];
+  int _computeSafetyScore(Map<String, dynamic> med) {
+    // Simple, extensible scoring (advanced-ready)
+    // Add more signals over time without changing API.
+    int score = 0;
+
+    final bool hasContra = (med['contraindications'] is List) &&
+        (med['contraindications'] as List).isNotEmpty;
+    final bool hasInteractions = (med['interactions'] is List) &&
+        (med['interactions'] as List).isNotEmpty;
+
+    if (hasContra) score += 35;
+    if (hasInteractions) score += 25;
+
+    final int ageRisk = _asInt(med['ageRiskScore'], 0); // optional field
+    score += ageRisk.clamp(0, 40);
+
+    return score.clamp(0, 100);
+  }
+
+  String _category(int score) {
+    if (score < 25) return 'Low';
+    if (score < 55) return 'Moderate';
+    if (score < 80) return 'Elevated';
+    return 'High';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final w = widget.width ?? MediaQuery.of(context).size.width;
+    final theme = FlutterFlowTheme.of(context);
 
-    return SizedBox(
-      width: w,
-      child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+    final medRef = medicationRef.withConverter<Map<String, dynamic>>(
+      fromFirestore: (s, _) => (s.data() ?? {}),
+      toFirestore: (m, _) => m,
+    );
+
+    final sideEffectsRef = medRef.collection('sideEffects');
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: medRef.snapshots(),
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          return _card(theme,
+              child: const Center(child: CircularProgressIndicator()));
+        }
+
+        final med = snap.data!.data() ?? {};
+        final score = _computeSafetyScore(med);
+        final cat = _category(score);
+
+        final instructions = (med['instructions'] ?? '').toString();
+        final contraindications = (med['contraindications'] is List)
+            ? (med['contraindications'] as List).cast<dynamic>()
+            : const [];
+        final interactions = (med['interactions'] is List)
+            ? (med['interactions'] as List).cast<dynamic>()
+            : const [];
+
+        return _card(
+          theme,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                "AI Medication Safety Summary",
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+              Text('Safety summary', style: theme.titleMedium),
+              const SizedBox(height: 8),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Risk: $cat',
+                      style: theme.headlineSmall
+                          .copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  Text('$score/100', style: theme.bodyMedium),
+                ],
               ),
               const SizedBox(height: 10),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.smart_toy),
-                label: const Text("Generate Safety Summary"),
-                onPressed: _runAISummary,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 48),
-                ),
+
+              if (instructions.isNotEmpty) ...[
+                Text('Instructions', style: theme.bodyMedium),
+                const SizedBox(height: 6),
+                Text(instructions, style: theme.bodySmall),
+                const SizedBox(height: 10),
+              ],
+
+              if (contraindications.isNotEmpty) ...[
+                Text('Contraindications', style: theme.bodyMedium),
+                const SizedBox(height: 6),
+                ...contraindications.take(4).map((e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text('• ${e.toString()}', style: theme.bodySmall),
+                    )),
+                const SizedBox(height: 10),
+              ],
+
+              if (interactions.isNotEmpty) ...[
+                Text('Interactions', style: theme.bodyMedium),
+                const SizedBox(height: 6),
+                ...interactions.take(4).map((e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text('• ${e.toString()}', style: theme.bodySmall),
+                    )),
+                const SizedBox(height: 10),
+              ],
+
+              // Recent side effects (no collectionGroup; scoped to this medication)
+              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: sideEffectsRef
+                    .orderBy('createdAtLocalMs', descending: true)
+                    .limit(3)
+                    .snapshots(),
+                builder: (context, seSnap) {
+                  if (!seSnap.hasData) return const SizedBox.shrink();
+                  final docs = seSnap.data!.docs;
+                  if (docs.isEmpty) {
+                    return Text('No recent side effects logged.',
+                        style: theme.bodySmall
+                            .copyWith(color: theme.secondaryText));
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Recent side effects', style: theme.bodyMedium),
+                      const SizedBox(height: 6),
+                      ...docs.map((d) {
+                        final m = d.data();
+                        final label = (m['label'] ?? m['note'] ?? 'Side effect')
+                            .toString();
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text('• $label', style: theme.bodySmall),
+                        );
+                      }),
+                    ],
+                  );
+                },
               ),
-              const SizedBox(height: 16),
-              if (_loading) const Center(child: CircularProgressIndicator()),
-              if (!_loading && _summary != null) _buildAISummary(),
             ],
           ),
-        ),
+        );
+      },
+    );
+  }
+
+  Widget _card(FlutterFlowTheme theme, {required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.secondaryBackground,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: theme.alternate),
       ),
+      child: child,
     );
-  }
-
-  // UI for AI output
-
-  Widget _buildAISummary() {
-    Color riskColor = Colors.green;
-    if ((_riskScore ?? 0) >= 75)
-      riskColor = Colors.red;
-    else if ((_riskScore ?? 0) >= 50)
-      riskColor = Colors.orange;
-    else if ((_riskScore ?? 0) >= 25) riskColor = Colors.amber;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-              color: riskColor.withOpacity(.15),
-              border: Border.all(color: riskColor),
-              borderRadius: BorderRadius.circular(10)),
-          child: Text(
-            "Risk Level: ${_riskScore ?? 0} / 100",
-            style: TextStyle(
-                fontSize: 18, fontWeight: FontWeight.bold, color: riskColor),
-          ),
-        ),
-        const SizedBox(height: 16),
-        const Text(
-          "Summary",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 6),
-        Text(_summary ?? "", style: const TextStyle(fontSize: 15)),
-        const SizedBox(height: 16),
-        if (_recommendations.isNotEmpty) _buildRecs(),
-      ],
-    );
-  }
-
-  Widget _buildRecs() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Recommendations",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        ..._recommendations.map(
-          (r) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.check_circle, size: 18, color: Colors.blue),
-                const SizedBox(width: 8),
-                Expanded(
-                  child:
-                      Text(r.toString(), style: const TextStyle(fontSize: 15)),
-                ),
-              ],
-            ),
-          ),
-        )
-      ],
-    );
-  }
-
-  // SAFETY SUMMARY LOGIC
-
-  Future<void> _runAISummary() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-
-    setState(() {
-      _loading = true;
-      _summary = null;
-      _riskScore = null;
-      _recommendations = [];
-    });
-
-    // 1. Load all medications
-    final medsSnap = await FirebaseFirestore.instance
-        .collection("users")
-        .doc(uid)
-        .collection("medications")
-        .get();
-
-    final meds = medsSnap.docs
-        .map((d) => {
-              "id": d.id,
-              "name": d.data()["name"] ?? "",
-              "dosage": d.data()["dosage"] ?? "",
-              "strength": d.data()["strength"] ?? "",
-              "schedule": d.data()["schedule"] ?? [],
-              "remaining": d.data()["remaining"] ?? 0,
-            })
-        .toList();
-
-    // 2. Load side-effects for each medication (FlutterFlow-compatible)
-    List<Map<String, dynamic>> sideEffects = [];
-
-    for (final med in medsSnap.docs) {
-      final seSnap = await med.reference.collection("sideEffects").get();
-
-      for (final se in seSnap.docs) {
-        sideEffects.add({
-          "medId": med.id,
-          "description": se.data()["description"] ?? "",
-          "severity": se.data()["severity"] ?? "",
-        });
-      }
-    }
-
-    // 3. Send to AI
-    try {
-      final resp = await http.post(
-        Uri.parse(_aiUrl),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "medications": meds,
-          "sideEffects": sideEffects,
-        }),
-      );
-
-      if (!resp.statusCode.toString().startsWith("2")) {
-        _show("AI error ${resp.statusCode}");
-        setState(() => _loading = false);
-        return;
-      }
-
-      final json = jsonDecode(resp.body);
-
-      setState(() {
-        _summary = json["summary"] ?? "";
-        _riskScore = json["riskScore"] ?? 0;
-        _recommendations = json["recommendations"] ?? [];
-        _loading = false;
-      });
-    } catch (e) {
-      _show("Error: $e");
-      setState(() => _loading = false);
-    }
-  }
-
-  void _show(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 }
-
-// Set your widget name, define your parameter, and then add the
-// boilerplate code using the green button on the right!

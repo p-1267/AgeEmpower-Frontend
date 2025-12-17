@@ -10,10 +10,12 @@ import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
+import '/custom_code/widgets/index.dart'; // IMPORTANT: pulls SafeZoneCWFirestoreService
+import '/custom_code/actions/index.dart';
+import '/flutter_flow/custom_functions.dart';
+
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:location/location.dart';
-import 'SafeZoneCWFirestoreService.dart';
 
 class SafeZoneCWMonitor extends StatefulWidget {
   const SafeZoneCWMonitor({super.key});
@@ -32,7 +34,7 @@ class _SafeZoneCWMonitorState extends State<SafeZoneCWMonitor> {
   @override
   void initState() {
     super.initState();
-    _startMonitoring();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startMonitoring());
   }
 
   @override
@@ -41,31 +43,23 @@ class _SafeZoneCWMonitorState extends State<SafeZoneCWMonitor> {
     super.dispose();
   }
 
-  // ------------------------------------------------------------------------
-  // START MONITOR LOOP
-  // Runs every 10 seconds (battery-friendly)
-  // ------------------------------------------------------------------------
   Future<void> _startMonitoring() async {
     final service = SafeZoneCWFirestoreService.of(context);
     if (service == null) return;
 
-    // initial load
     zones = await service.readZones();
 
-    // periodic loop
     monitorTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
       if (!monitoring) return;
 
-      // get user location
       final userLoc = await service.getUserLocation();
       if (userLoc == null) return;
       lastKnownLocation = userLoc;
 
-      // check each zone
       for (final zone in zones) {
-        final center = zone["center"] as GeoPoint;
-        final radius = (zone["radius"] as num).toDouble();
-        final zoneId = zone["zoneId"];
+        final center = zone['center'] as GeoPoint;
+        final radius = (zone['radius'] as num).toDouble();
+        final zoneId = zone['zoneId'] as String;
 
         final inside = service.isInsideZone(
           userLocation: userLoc,
@@ -74,7 +68,6 @@ class _SafeZoneCWMonitorState extends State<SafeZoneCWMonitor> {
         );
 
         if (!inside) {
-          // user wandering → trigger emergency alert
           await service.triggerWanderingAlert(
             zoneId: zoneId,
             lastLocation: userLoc,
@@ -84,9 +77,6 @@ class _SafeZoneCWMonitorState extends State<SafeZoneCWMonitor> {
     });
   }
 
-  // ------------------------------------------------------------------------
-  // UI (Status Widget)
-  // ------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -109,21 +99,16 @@ class _SafeZoneCWMonitorState extends State<SafeZoneCWMonitor> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              monitoring ? "Safe Zone Monitoring Active" : "Monitoring Paused",
+              monitoring ? 'Safe Zone Monitoring Active' : 'Monitoring Paused',
               style: const TextStyle(fontSize: 18),
             ),
           ),
           Switch(
             value: monitoring,
-            onChanged: (v) {
-              setState(() => monitoring = v);
-            },
+            onChanged: (v) => setState(() => monitoring = v),
           ),
         ],
       ),
     );
   }
 }
-
-// Set your widget name, define your parameter, and then add the
-// boilerplate code using the green button on the right!

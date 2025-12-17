@@ -65,7 +65,6 @@ class _AppointmentAISummaryCWState extends State<AppointmentAISummaryCW> {
         .get();
     final sideSnap = await FirebaseFirestore.instance
         .collection("users")
-        .doc(uid)
         .collectionGroup("sideEffects")
         .get();
 

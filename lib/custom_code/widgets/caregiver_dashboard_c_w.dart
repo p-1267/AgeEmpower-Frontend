@@ -29,7 +29,8 @@ class CaregiverDashboardCW extends StatelessWidget {
       future: FirebaseFirestore.instance.collection("users").doc(me.uid).get(),
       builder: (c, snap) {
         if (!snap.hasData) return const CircularProgressIndicator();
-        final linked = snap.data!.data()?["linkedTo"];
+        final data = snap.data!.data() as Map<String, dynamic>?;
+        final linked = data?['linkedTo'];
         if (linked == null) return const Text("No patient assigned.");
 
         return _overview(context, linked);

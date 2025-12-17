@@ -10,12 +10,23 @@ import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
+import '/custom_code/widgets/index.dart';
+import '/custom_code/actions/index.dart';
+import '/flutter_flow/custom_functions.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'EmergencyAISummaryWidget.dart';
+import 'emergency_a_i_summary_widget.dart';
 
 class FamilyEmergencyMonitorCW extends StatefulWidget {
-  const FamilyEmergencyMonitorCW({super.key});
+  const FamilyEmergencyMonitorCW({
+    super.key,
+    this.width,
+    this.height,
+  });
+
+  final double? width;
+  final double? height;
 
   @override
   State<FamilyEmergencyMonitorCW> createState() =>
@@ -32,36 +43,40 @@ class _FamilyEmergencyMonitorCWState extends State<FamilyEmergencyMonitorCW> {
   }
 
   // --------------------------------------------------------------------
-  // Main UI
+  // MAIN UI
   // --------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     if (familyUserId == null) {
       return const Center(
-        child: Text("No family account detected."),
+        child: Text('No family account detected.'),
       );
     }
 
-    return Column(
-      children: [
-        _buildHeader(),
-        Expanded(child: _buildEmergencyStream()),
-      ],
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: Column(
+        children: [
+          _buildHeader(),
+          Expanded(child: _buildEmergencyStream()),
+        ],
+      ),
     );
   }
 
   // --------------------------------------------------------------------
-  // Header
+  // HEADER
   // --------------------------------------------------------------------
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.all(14.0),
+      padding: const EdgeInsets.all(14),
       child: Row(
         children: const [
           Icon(Icons.family_restroom, size: 36),
           SizedBox(width: 10),
           Text(
-            "Family Emergency Monitor",
+            'Family Emergency Monitor',
             style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
           ),
         ],
@@ -70,13 +85,13 @@ class _FamilyEmergencyMonitorCWState extends State<FamilyEmergencyMonitorCW> {
   }
 
   // --------------------------------------------------------------------
-  // Live Firestore Stream for Emergencies
+  // FIRESTORE STREAM
   // --------------------------------------------------------------------
   Widget _buildEmergencyStream() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection("emergencies")
-          .orderBy("timestamp", descending: true)
+          .collection('emergencies')
+          .orderBy('timestamp', descending: true)
           .snapshots(),
       builder: (context, snap) {
         if (!snap.hasData) {
@@ -99,7 +114,7 @@ class _FamilyEmergencyMonitorCWState extends State<FamilyEmergencyMonitorCW> {
             if (familyEvents.isEmpty) {
               return const Center(
                 child: Text(
-                  "No emergencies for your loved ones.",
+                  'No emergencies for your loved ones.',
                   style: TextStyle(fontSize: 18),
                 ),
               );
@@ -117,25 +132,26 @@ class _FamilyEmergencyMonitorCWState extends State<FamilyEmergencyMonitorCW> {
   }
 
   // --------------------------------------------------------------------
-  // Filter only emergencies related to seniors linked to this family
+  // FILTER EVENTS BY FAMILY LINK
   // --------------------------------------------------------------------
   Future<List<Map<String, dynamic>>> _filterFamilyEvents(
-      List<Map<String, dynamic>> events) async {
-    List<Map<String, dynamic>> results = [];
+    List<Map<String, dynamic>> events,
+  ) async {
+    final List<Map<String, dynamic>> results = [];
 
     for (final e in events) {
-      final userId = e["userId"];
+      final userId = e['userId'];
       if (userId == null) continue;
 
       final userSnap = await FirebaseFirestore.instance
-          .collection("users")
+          .collection('users')
           .doc(userId)
           .get();
 
       final data = userSnap.data();
       if (data == null) continue;
 
-      final familyList = (data["family"] ?? []) as List;
+      final List familyList = (data['family'] ?? []) as List;
 
       if (familyList.contains(familyUserId)) {
         results.add(e);
@@ -146,33 +162,33 @@ class _FamilyEmergencyMonitorCWState extends State<FamilyEmergencyMonitorCW> {
   }
 
   // --------------------------------------------------------------------
-  // Emergency Card UI
+  // EMERGENCY CARD
   // --------------------------------------------------------------------
   Widget _buildEmergencyCard(Map<String, dynamic> event) {
-    final bool resolved = event["resolved"] == true;
-    final String type = event["type"] ?? "sos";
-    final Timestamp? ts = event["timestamp"];
-    final String eventId = event["eventId"] ?? "";
-    final location = event["location"];
+    final bool resolved = event['resolved'] == true;
+    final String type = event['type'] ?? 'sos';
+    final Timestamp? ts = event['timestamp'];
+    final String eventId = event['eventId'] ?? '';
+    final location = event['location'];
 
     IconData icon;
     Color color;
 
     switch (type) {
-      case "fall_detected":
-        icon = Icons.falling_rounded;
+      case 'fall_detected':
+        icon = Icons.warning_amber_rounded;
         color = Colors.orange;
         break;
-      case "wandering_alert":
+      case 'wandering_alert':
         icon = Icons.directions_walk;
         color = Colors.blue;
         break;
-      case "chat_detected":
+      case 'chat_detected':
         icon = Icons.chat_bubble_outline;
         color = Colors.purple;
         break;
       default:
-        icon = Icons.warning_amber_rounded;
+        icon = Icons.warning_rounded;
         color = Colors.red;
     }
 
@@ -190,14 +206,13 @@ class _FamilyEmergencyMonitorCWState extends State<FamilyEmergencyMonitorCW> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ICON + TITLE
           Row(
             children: [
               Icon(icon, size: 40, color: color),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
-                  resolved ? "Resolved Emergency" : type.toUpperCase(),
+                  resolved ? 'RESOLVED' : type.toUpperCase(),
                   style: TextStyle(
                     fontSize: 20,
                     color: resolved ? Colors.grey : color,
@@ -207,26 +222,17 @@ class _FamilyEmergencyMonitorCWState extends State<FamilyEmergencyMonitorCW> {
               ),
             ],
           ),
-
           const SizedBox(height: 10),
-
           if (ts != null)
-            Text("Time: ${ts.toDate()}", style: const TextStyle(fontSize: 16)),
-
-          Text("Event ID: $eventId", style: const TextStyle(fontSize: 16)),
-
+            Text('Time: ${ts.toDate()}', style: const TextStyle(fontSize: 16)),
+          Text('Event ID: $eventId', style: const TextStyle(fontSize: 16)),
           const SizedBox(height: 12),
-
-          // LOCATION (simple text for family)
           if (location != null)
             Text(
-              "Location: ${location.latitude.toStringAsFixed(5)}, ${location.longitude.toStringAsFixed(5)}",
+              'Location: ${location.latitude.toStringAsFixed(5)}, ${location.longitude.toStringAsFixed(5)}',
               style: const TextStyle(fontSize: 14),
             ),
-
           const SizedBox(height: 12),
-
-          // ACTIONS
           Row(
             children: [
               ElevatedButton(
@@ -234,15 +240,15 @@ class _FamilyEmergencyMonitorCWState extends State<FamilyEmergencyMonitorCW> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.deepPurple,
                 ),
-                child: const Text("AI Summary"),
+                child: const Text('AI Summary'),
               ),
               const SizedBox(width: 10),
               ElevatedButton(
-                onPressed: () => _messageSenior(),
+                onPressed: _messageSenior,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
                 ),
-                child: const Text("Message"),
+                child: const Text('Message'),
               ),
             ],
           ),
@@ -252,7 +258,7 @@ class _FamilyEmergencyMonitorCWState extends State<FamilyEmergencyMonitorCW> {
   }
 
   // --------------------------------------------------------------------
-  // Show AI Summary Modal
+  // AI SUMMARY
   // --------------------------------------------------------------------
   void _showAISummary(String eventId) {
     showDialog(
@@ -268,16 +274,13 @@ class _FamilyEmergencyMonitorCWState extends State<FamilyEmergencyMonitorCW> {
   }
 
   // --------------------------------------------------------------------
-  // Placeholder for messaging system
+  // PLACEHOLDER MESSAGE ACTION
   // --------------------------------------------------------------------
   void _messageSenior() {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text("Messaging feature will open senior chat."),
+        content: Text('Messaging feature will open senior chat.'),
       ),
     );
   }
 }
-
-// Set your widget name, define your parameter, and then add the
-// boilerplate code using the green button on the right!

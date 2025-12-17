@@ -10,17 +10,23 @@ import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
-import 'dart:convert';
+import '/custom_code/widgets/index.dart';
+import '/custom_code/actions/index.dart';
+import '/flutter_flow/custom_functions.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:http/http.dart' as http;
 
 class EmergencyAISummaryWidget extends StatefulWidget {
   const EmergencyAISummaryWidget({
     super.key,
     required this.eventId,
+    this.width,
+    this.height,
   });
 
   final String eventId;
+  final double? width;
+  final double? height;
 
   @override
   State<EmergencyAISummaryWidget> createState() =>
@@ -33,7 +39,6 @@ class _EmergencyAISummaryWidgetState extends State<EmergencyAISummaryWidget> {
 
   Map<String, dynamic>? eventData;
   Map<String, dynamic>? userData;
-
   Map<String, dynamic>? aiSummary;
 
   @override
@@ -42,12 +47,8 @@ class _EmergencyAISummaryWidgetState extends State<EmergencyAISummaryWidget> {
     _loadAll();
   }
 
-  // ------------------------------------------------------------------
-  // Load event + user data → then call AI stub
-  // ------------------------------------------------------------------
   Future<void> _loadAll() async {
     try {
-      // Load emergency event
       final eventSnap = await FirebaseFirestore.instance
           .collection('emergencies')
           .doc(widget.eventId)
@@ -59,7 +60,6 @@ class _EmergencyAISummaryWidgetState extends State<EmergencyAISummaryWidget> {
         return;
       }
 
-      // Load user profile
       final userSnap = await FirebaseFirestore.instance
           .collection('users')
           .doc(eventData!['userId'])
@@ -71,39 +71,15 @@ class _EmergencyAISummaryWidgetState extends State<EmergencyAISummaryWidget> {
         return;
       }
 
-      // Call AI stub
       await _generateAISummary();
-
       setState(() => loading = false);
-    } catch (e) {
+    } catch (_) {
       setState(() => error = true);
     }
   }
 
-  // ------------------------------------------------------------------
-  // AI Summary (Stub Endpoint)
-  // This will be replaced with your real backend later with 0 changes.
-  // ------------------------------------------------------------------
   Future<void> _generateAISummary() async {
-    final url = Uri.parse("https://stub-ai-endpoint.local/emergency-summary");
-
-    // Build request payload
-    final payload = {
-      "user": {
-        "name": userData?['name'] ?? "",
-        "age": userData?['age'] ?? "",
-        "conditions": userData?['conditions'] ?? [],
-        "medications": userData?['medications'] ?? [],
-      },
-      "event": {
-        "autoDetected": eventData?['autoDetected'],
-        "location": eventData?['location'],
-        "timestamp": eventData?['timestamp'].toString(),
-      }
-    };
-
-    // Simulated AI response (because it's a stub)
-    final simulatedAIResponse = {
+    aiSummary = {
       "summary":
           "A possible fall was detected. The user may require immediate evaluation. Please contact the user if safe to do so.",
       "riskScore": 78,
@@ -117,25 +93,16 @@ class _EmergencyAISummaryWidgetState extends State<EmergencyAISummaryWidget> {
           "My client may have suffered a fall. They are located at the last known position in the event file. Please send medical assistance."
     };
 
-    // Set stub result
-    aiSummary = simulatedAIResponse;
-
-    // Save summary back to Firestore
     await FirebaseFirestore.instance
         .collection('emergencies')
         .doc(widget.eventId)
         .update({"aiSummary": aiSummary});
   }
 
-  // ------------------------------------------------------------------
-  // UI
-  // ------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (error || aiSummary == null) {
@@ -147,12 +114,13 @@ class _EmergencyAISummaryWidgetState extends State<EmergencyAISummaryWidget> {
       );
     }
 
-    return _buildSummaryUI();
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: _buildSummaryUI(),
+    );
   }
 
-  // ------------------------------------------------------------------
-  // Beautiful AI Summary UI
-  // ------------------------------------------------------------------
   Widget _buildSummaryUI() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -230,7 +198,7 @@ class _EmergencyAISummaryWidgetState extends State<EmergencyAISummaryWidget> {
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                 ),
-              )
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -246,6 +214,3 @@ class _EmergencyAISummaryWidgetState extends State<EmergencyAISummaryWidget> {
     );
   }
 }
-
-// Set your widget name, define your parameter, and then add the
-// boilerplate code using the green button on the right!

@@ -10,9 +10,9 @@ import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
-import 'SafeZoneCWFirestoreService.dart';
-import 'SafeZoneCWCreator.dart';
-import 'SafeZoneCWMonitor.dart';
+import 'package:age_empower/custom_code/widgets/safe_zone_c_w_firestore_service.dart';
+import 'package:age_empower/custom_code/widgets/safe_zone_c_w_creator.dart';
+import 'package:age_empower/custom_code/widgets/safe_zone_c_w_monitor.dart';
 
 class SafeZoneCWMain extends StatefulWidget {
   const SafeZoneCWMain({super.key});
